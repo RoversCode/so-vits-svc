@@ -165,3 +165,10 @@ pretrain/
 .vscode/launch.json
 
 trained/**/
+
+
+Data
+modeldata
+backup
+ckpts
+eres2net

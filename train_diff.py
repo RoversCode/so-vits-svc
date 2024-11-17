@@ -1,7 +1,7 @@
 import argparse
 
 import torch
-from loguru import logger
+import logging
 from torch.optim import lr_scheduler
 
 from diffusion.data_loaders import get_data_loaders
@@ -9,6 +9,10 @@ from diffusion.logger import utils
 from diffusion.solver import train
 from diffusion.unit2mel import Unit2Mel
 from diffusion.vocoder import Vocoder
+
+logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.DEBUG)
 
 
 def parse_args(args=None, namespace=None):

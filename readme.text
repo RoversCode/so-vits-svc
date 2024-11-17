@@ -1,0 +1,12 @@
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi"
+
+
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi" -shd -dm "logs/44k/diffusion/model_2000.pt"
+
+
+切片
+重采样
+mel
+spec
+ssl feature
+f0, uv
