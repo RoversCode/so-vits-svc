@@ -1,12 +1,126 @@
-import os.path
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+"""
+@File    :   data_structure.py
+@Time    :   2024/11/11 20:52:54
+@Author  :   ChengHee
+@Version :   1.0
+@Contact :   liujunjie199810@gmail.com
+@Desc    :   None
+"""
+
+# here put the import lib
+import os
+import sys
+
+# 获取当前文件的绝对路径
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+# 拿到父目录
+parent_dir = os.path.dirname(cur_dir)
+sys.path.append(parent_dir)
+import numpy as np
+import librosa
+import soundfile
+import json
+from pathlib import Path
+from tqdm import tqdm
 from argparse import ArgumentParser
 
-import numpy as np
-import soundfile
-import librosa
+
+def main(args):
+    """
+    # 切片并重新命名
+    """
+    audio_dir = Path(args.audio_dir)
+    # 创建切片文件夹
+    output_dir = audio_dir.parent / "audio_slice"
+    output_dir.mkdir(parents=True, exist_ok=True)  # 创建文件夹
+    spk_info = {}
+    # 检测里面是否含有音频文件夹
+    subdirs = [x for x in audio_dir.iterdir() if x.is_dir()]
+    if len(subdirs) == 0:
+        # 创建一个audio_dir.parent.name的文件夹
+        (audio_dir / audio_dir.parent.name).mkdir(parents=True, exist_ok=True)
+        subdirs = [audio_dir.parent.name]
+
+    slicer = Slicer(
+        sr=args.sr,
+        threshold=args.db_thresh,
+        min_length=args.sliced_min_length,
+        audio_min_length=args.audio_min_length,
+        min_interval=args.min_interval,
+        hop_size=args.hop_size,
+        max_sil_kept=args.max_sil_kept,
+    )
+    slice_grain = Slicer(
+        sr=args.sr,
+        threshold=args.db_thresh,
+        min_length=args.sliced_min_length,
+        min_interval=args.min_interval * 0.5,
+        hop_size=args.hop_size,
+        max_sil_kept=args.max_sil_kept,
+    )
+    # 遍历说话人文件夹
+    for spk_name in tqdm(subdirs):
+        spk_info[spk_name] = len(spk_info)
+        dir_path = audio_dir / spk_name
+        out_spk_dir = output_dir / spk_name
+        out_spk_dir.mkdir(parents=True, exist_ok=True)  # 创建文件夹
+        files = dir_path.glob("*.wav")  # 仅支持wav格式
+        file_idx = 0  # 文件序列
+        for file_name in files:
+            audio, sr = librosa.load(dir_path / file_name, sr=args.sr)
+            chunks = slicer.slice(audio)
+            for chunk in chunks:
+                # NOTE: 如果chunk大于10s，下面硬切硬切5s
+                time_inter = 10
+                max_length = 15
+                if len(chunk) > max_length * sr:
+                    second_chunks = slice_grain.slice(chunk)
+                    for c in second_chunks:
+                        if len(c) > max_length * sr:
+                            num = len(c) // (time_inter * sr)
+                            for n in range(num):
+                                soundfile.write(
+                                    out_spk_dir / f"{spk_name}_{file_idx:06d}.wav",
+                                    c[n * time_inter * sr : (n + 1) * time_inter * sr],
+                                    sr,
+                                )
+                                file_idx += 1
+                            if (
+                                len(c[num * time_inter * sr :])
+                                > args.audio_min_length * sr
+                            ):
+                                soundfile.write(
+                                    out_spk_dir / f"{spk_name}_{file_idx:06d}.wav",
+                                    c[num * time_inter * sr :],
+                                    sr,
+                                )
+                                file_idx += 1
+                        else:
+                            soundfile.write(
+                                out_spk_dir / f"{spk_name}_{file_idx:06d}.wav",
+                                c,
+                                sr,
+                            )
+                            file_idx += 1
+                else:
+                    soundfile.write(
+                        out_spk_dir / f"{spk_name}_{file_idx:06d}.wav",
+                        chunk,
+                        sr,
+                    )
+                    file_idx += 1
+
+    # 保存说话人信息
+    json.dump(
+        spk_info,
+        open(audio_dir.parent / "spk_info.json", "w"),
+        ensure_ascii=False,
+        indent=4,
+    )
 
 
-# This function is obtained from librosa.
 def get_rms(
     y,
     *,
@@ -212,132 +326,51 @@ class Slicer:
             return new_chunks
 
 
-def traverse_dir_files(root_dir, ext="dic"):
-    paths_list=[]
-    for parent, _, fileNames in os.walk(root_dir):
-        for name in fileNames:
-            if name.startswith('.'):  # 去除隐藏文件
-                continue
-            if ext:  # 根据后缀名搜索
-                if name.endswith(tuple(ext)):
-                    # names_list.append(name)
-                    paths_list.append(os.path.join(parent, name))
-            else:
-                # names_list.append(name)
-                paths_list.append(os.path.join(parent, name))
-
-    return paths_list
-
-
-def main(
-    audio_path,
-    out_path=None,
-    db_thresh=-40,
-    sliced_min_length=2000,
-    audio_min_length=1000,
-    min_interval=100,
-    hop_size=10,
-    max_sil_kept=500,
-    fine_graind=False,
-):
-    if out_path is None:
-        out_path = os.path.dirname(os.path.abspath(audio_path))
-    audio, sr = librosa.load(audio_path, sr=None)
-    slicer = Slicer(
-        sr=sr,
-        threshold=db_thresh,
-        min_length=sliced_min_length,
-        audio_min_length=audio_min_length,
-        min_interval=min_interval,
-        hop_size=hop_size,
-        max_sil_kept=max_sil_kept,
-    )
-    slice_grain = Slicer(
-        sr=sr,
-        threshold=db_thresh,
-        min_length=sliced_min_length,
-        audio_min_length=audio_min_length,
-        min_interval=min_interval * 0.5,
-        hop_size=hop_size,
-        max_sil_kept=max_sil_kept,
-    )
-    chunks = slicer.slice(audio)
-    if not os.path.exists(out_path):
-        os.makedirs(out_path)
-    for i, chunk in enumerate(chunks):
-        # NOTE: 如果chunk大于10s，下面硬切硬切5s
-        time_inter = 5
-        max_length = 15
-        if len(chunk) > max_length * sr and fine_graind:
-            # NOTE: 按照参数再切一次
-            second_chunks = slice_grain.slice(chunk)
-            for j, c in enumerate(second_chunks):
-                # NOTE: 还是太大块，硬切
-                if len(c) > max_length * sr:
-                    num = len(c) // (time_inter * sr)
-                    for n in range(num):
-                        soundfile.write(
-                            os.path.join(
-                                out_path,
-                                "%s_%d_%d_%d.wav"
-                                % (
-                                    os.path.basename(audio_path).rsplit(
-                                        ".", maxsplit=1
-                                    )[0],
-                                    i,
-                                    j,
-                                    n,
-                                ),
-                            ),
-                            c[n * time_inter * sr : (n + 1) * time_inter * sr],
-                            sr,
-                        )
-                    # 余下的
-                    if len(c[num * time_inter * sr :]) > 2 * sr:
-                        soundfile.write(
-                            os.path.join(
-                                out_path,
-                                "%s_%d_%d_%d.wav"
-                                % (
-                                    os.path.basename(audio_path).rsplit(
-                                        ".", maxsplit=1
-                                    )[0],
-                                    i,
-                                    j,
-                                    num,
-                                ),
-                            ),
-                            c[num * 5 * sr :],
-                            sr,
-                        )
-                else:
-                    soundfile.write(
-                        os.path.join(
-                            out_path,
-                            "%s_%d_%d.wav"
-                            % (
-                                os.path.basename(audio_path).rsplit(".", maxsplit=1)[0],
-                                i,
-                                j,
-                            ),
-                        ),
-                        c,
-                        sr,
-                    )
-        else:
-            soundfile.write(
-                os.path.join(
-                    out_path,
-                    "%s_%d.wav"
-                    % (os.path.basename(audio_path).rsplit(".", maxsplit=1)[0], i),
-                ),
-                chunk,
-                sr,
-            )
-
-
 if __name__ == "__main__":
-    from tqdm import tqdm
-    paths = traverse_dir_files("/mnt/e/Workspace/growth/audio/so-vits-svc/preprocess/raw_data/蜡笔小新去混响", "wav")
-    for p in tqdm(paths):
-        main(audio_path=p, out_path='/mnt/e/Workspace/growth/audio/so-vits-svc/preprocess/raw_data/蜡笔小新切片')
+    parser = ArgumentParser()
+    parser.add_argument("--audio_dir", type=str, help="The audio to be sliced")
+    parser.add_argument("--sr", type=int, default=44100, help="The audio to be sliced")
+    parser.add_argument(
+        "--db_thresh",
+        type=float,
+        required=False,
+        default=-40,
+        help="The dB threshold for silence detection",
+    )
+    parser.add_argument(
+        "--sliced_min_length",
+        type=int,
+        required=False,
+        default=10000,
+        help="当一个音频片段大于这个值，这个片段才会被切分",
+    )
+    parser.add_argument(
+        "--audio_min_length",
+        type=int,
+        required=False,
+        default=2000,
+        help="切片后的音频片段最小长度",
+    )
+    parser.add_argument(
+        "--min_interval",
+        type=int,
+        required=False,
+        default=300,
+        help="静音部分被切分的最小毫秒数",
+    )
+    parser.add_argument(
+        "--hop_size",
+        type=int,
+        required=False,
+        default=10,
+        help="Frame length in milliseconds",
+    )
+    parser.add_argument(
+        "--max_sil_kept",
+        type=int,
+        required=False,
+        default=500,
+        help="切片两端能保留静音的最大长度，毫秒为单位",
+    )
+    args = parser.parse_args()
+    main(args)

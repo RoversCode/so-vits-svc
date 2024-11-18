@@ -172,3 +172,5 @@ modeldata
 backup
 ckpts
 eres2net
+raw_audios
+ft_ckpt

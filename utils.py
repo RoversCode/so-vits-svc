@@ -462,9 +462,7 @@ def get_hparams_from_dir(model_dir):
 
 
 def get_hparams_from_file(config_path, infer_mode=False):
-    with open(config_path, "r") as f:
-        data = f.read()
-    config = json.loads(data)
+    config = yaml.safe_load(open(config_path))
     hparams = HParams(**config) if not infer_mode else InferHParams(**config)
     return hparams
 

@@ -1,5 +1,7 @@
-python preprocess/data_structure.py  \
- --audio_dir raw/sunyanzi \
+name="sunyanzi"
+python preprocess/rename_and_slice.py  \
+ --audio_dir ft_ckpt/$name/raw_audio \
+ --sr 44100 \
  --db_thresh -40 \
  --sliced_min_length 5000 \
  --min_interval 300 \
