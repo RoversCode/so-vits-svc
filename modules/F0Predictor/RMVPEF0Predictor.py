@@ -52,7 +52,7 @@ class RMVPEF0Predictor(F0Predictor):
             content = torch.from_numpy(content)
 
         results = torch.nn.functional.interpolate(content,
-                                                  size=target_len,
+                                                  size=int(target_len),
                                                   mode=mode)
 
         if is_np:
@@ -95,31 +95,22 @@ class RMVPEF0Predictor(F0Predictor):
 
         # 大概可以用 torch 重写?
         f0 = np.interp(time_frame, time_org, f0, left=f0[0], right=f0[-1])
-        #vuv_vector = np.ceil(scipy.ndimage.zoom(vuv_vector,pad_to/len(vuv_vector),order = 0))
-
+        # vuv_vector = np.ceil(scipy.ndimage.zoom(vuv_vector,pad_to/len(vuv_vector),order = 0))
         return f0, vuv_vector.cpu().numpy()
 
-    def compute_f0(self, wav, p_len=None):
-        x = torch.FloatTensor(wav).to(self.dtype).to(self.device)
+    def compute_f0_uv(self, wav, sr, p_len=None):
+        if isinstance(wav, np.ndarray):
+            wav = torch.from_numpy(wav).float()
+        if wav.device != self.device:
+            wav = wav.to(self.device)
+        x = wav
         if p_len is None:
-            p_len = x.shape[0] // self.hop_length
+            dur = len(wav) / sr
+            p_len = int((dur * self.sampling_rate) // self.hop_length)
         else:
             assert abs(p_len -
                        x.shape[0] // self.hop_length) < 4, "pad length error"
-        f0 = self.rmvpe.infer_from_audio(x, self.sampling_rate, self.threshold)
-        if torch.all(f0 == 0):
-            rtn = f0.cpu().numpy() if p_len is None else np.zeros(p_len)
-            return rtn, rtn
-        return self.post_process(x, self.sampling_rate, f0, p_len)[0]
-
-    def compute_f0_uv(self, wav, p_len=None):
-        x = torch.FloatTensor(wav).to(self.dtype).to(self.device)
-        if p_len is None:
-            p_len = x.shape[0] // self.hop_length
-        else:
-            assert abs(p_len -
-                       x.shape[0] // self.hop_length) < 4, "pad length error"
-        f0 = self.rmvpe.infer_from_audio(x, self.sampling_rate, self.threshold)
+        f0 = self.rmvpe.infer_from_audio(x, sr, self.threshold)
         if torch.all(f0 == 0):
             rtn = f0.cpu().numpy() if p_len is None else np.zeros(p_len)
             return rtn, rtn

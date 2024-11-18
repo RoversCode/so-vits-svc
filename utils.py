@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File    :   utils.py
+@Time    :   2024/11/13 21:09:53
+@Author  :   ChengHee
+@Version :   1.0
+@Contact :   liujunjie199810@gmail.com
+@Desc    :   None
+'''
+
+# here put the import lib
 import argparse
 import glob
 import json
@@ -7,8 +19,8 @@ import re
 import subprocess
 import sys
 import traceback
+import yaml
 from multiprocessing import cpu_count
-
 import faiss
 import librosa
 import numpy as np
@@ -179,7 +191,7 @@ def load_checkpoint(checkpoint_path,
                     skip_optimizer=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    iteration = checkpoint_dict['iteration']
+    iteration = checkpoint_dict['iteration']  # epoch
     learning_rate = checkpoint_dict['learning_rate']
     if optimizer is not None and not skip_optimizer and checkpoint_dict[
             'optimizer'] is not None:
@@ -297,9 +309,9 @@ def summarize(writer,
 
 
 def latest_checkpoint_path(dir_path, regex="G_*.pth"):
-    f_list = glob.glob(os.path.join(dir_path, regex))
-    f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
-    x = f_list[-1]
+    f_list = glob.glob(os.path.join(dir_path, regex)) 
+    f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f)))) # 根据提取的数据，排列
+    x = f_list[-1] # 取最新的ckpt
     print(x)
     return x
 
@@ -374,36 +386,64 @@ def load_filepaths_and_text(filename, split="|"):
     return filepaths_and_text
 
 
+def deep_update(base_dict, update_dict):
+    for key, value in update_dict.items():
+        if isinstance(value, dict) and key in base_dict and isinstance(base_dict[key], dict):
+            deep_update(base_dict[key], value)
+        else:
+            base_dict[key] = value
+
+
 def get_hparams(init=True):
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c',
-                        '--config',
+    # parser.add_argument('-c',
+    #                     '--config',
+    #                     type=str,
+    #                     default="./configs/config.json",
+    #                     help='JSON file for configuration')
+    # parser.add_argument('-m',
+    #                     '--model',
+    #                     type=str,
+    #                     default="model",
+    #                     help='Model name')
+    parser.add_argument('-exp',
+                        '--exp_name',
+                        default="test",
                         type=str,
-                        default="./configs/config.json",
-                        help='JSON file for configuration')
-    parser.add_argument('-m',
-                        '--model',
-                        type=str,
-                        required=True,
-                        help='Model name')
+                        help='本次实验名')
 
     args = parser.parse_args()
-    model_dir = os.path.join("./logs", args.model)
 
+        
+    # 加载基础配置
+    config = yaml.safe_load(open("configs/sovits_base_config.yaml"))
+    
+    # 检查是否存在exp_name文件夹
+    exp_dir = os.path.join("configs", args.exp_name)
+    if not os.path.exists(exp_dir):
+        os.makedirs(exp_dir)
+    if not os.path.exists(os.path.join(exp_dir, 'config.yaml')):
+        print("没有发现config.yml文件，使用默认配置训练")
+    else:
+        update_config = yaml.safe_load(open(os.path.join(exp_dir, 'config.yaml')))
+        deep_update(config, update_config)  # 更新配置
+    
+    
+    model_dir = os.path.join("ckpts", args.exp_name)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
 
-    config_path = args.config
-    config_save_path = os.path.join(model_dir, "config.json")
-    if init:
-        with open(config_path, "r") as f:
-            data = f.read()
-        with open(config_save_path, "w") as f:
-            f.write(data)
-    else:
-        with open(config_save_path, "r") as f:
-            data = f.read()
-    config = json.loads(data)
+    # config_path = args.config
+    # config_save_path = os.path.join(model_dir, "config.json")
+    # if init:
+    #     with open(config_path, "r") as f:
+    #         data = f.read()
+    #     with open(config_save_path, "w") as f:
+    #         f.write(data)
+    # else:
+    #     with open(config_save_path, "r") as f:
+    #         data = f.read()
+    # config = json.loads(data)
 
     hparams = HParams(**config)
     hparams.model_dir = model_dir
@@ -422,9 +462,7 @@ def get_hparams_from_dir(model_dir):
 
 
 def get_hparams_from_file(config_path, infer_mode=False):
-    with open(config_path, "r") as f:
-        data = f.read()
-    config = json.loads(data)
+    config = yaml.safe_load(open(config_path))
     hparams = HParams(**config) if not infer_mode else InferHParams(**config)
     return hparams
 

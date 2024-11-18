@@ -23,7 +23,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
     """
 
     def __init__(self, audiopaths, hparams, all_in_mem: bool = False, vol_aug: bool = True):
-        self.audiopaths = load_filepaths_and_text(audiopaths)
+        self.audiopaths = load_filepaths_and_text(audiopaths)  # 拼音路径
         self.hparams = hparams
         self.max_wav_value = hparams.data.max_wav_value
         self.sampling_rate = hparams.data.sampling_rate
@@ -57,26 +57,26 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
 
         # Ideally, all data generated after Mar 25 should have .spec.pt
         if os.path.exists(spec_filename):
-            spec = torch.load(spec_filename)
+            spec = torch.load(spec_filename)  # 
         else:
             spec = spectrogram_torch(audio_norm, self.filter_length,
                                      self.sampling_rate, self.hop_length, self.win_length,
-                                     center=False)
+                                     center=False)  # 线性谱
             spec = torch.squeeze(spec, 0)
             torch.save(spec, spec_filename)
 
         spk = filename.split("/")[-2]
-        spk = torch.LongTensor([self.spk_map[spk]])
+        spk = torch.LongTensor([self.spk_map[spk]]) # sid
 
-        f0, uv = np.load(filename + ".f0.npy",allow_pickle=True)
+        f0, uv = np.load(filename + ".f0.npy", allow_pickle=True)
         
-        f0 = torch.FloatTensor(np.array(f0,dtype=float))
-        uv = torch.FloatTensor(np.array(uv,dtype=float))
+        f0 = torch.FloatTensor(np.array(f0, dtype=float))
+        uv = torch.FloatTensor(np.array(uv, dtype=float))  # 标记音频信号中的有声和无声部分
 
-        c = torch.load(filename+ ".soft.pt")
+        c = torch.load(filename + ".soft.pt")  # ssl特征
         c = utils.repeat_expand_2d(c.squeeze(0), f0.shape[0], mode=self.unit_interpolate_mode)
         if self.vol_emb:
-            volume_path = filename + ".vol.npy"
+            volume_path = filename + ".vol.npy"  # 响度特征
             volume = np.load(volume_path)
             volume = torch.from_numpy(volume).float()
         else:
@@ -89,14 +89,12 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         audio_norm = audio_norm[:, :lmin * self.hop_length]
         if volume is not None:
             volume = volume[:lmin]
+        # c 是 ssl特征，f0是基频，spec是线性谱，audio_norm是音频，spk是说话人id，uv是有声无声标记，volume是响度
         return c, f0, spec, audio_norm, spk, uv, volume
 
     def random_slice(self, c, f0, spec, audio_norm, spk, uv, volume):
-        # if spec.shape[1] < 30:
-        #     print("skip too short audio:", filename)
-        #     return None
 
-        if random.choice([True, False]) and self.vol_aug and volume is not None:
+        if random.choice([True, False]) and self.vol_aug and volume is not None:  # 音量增强
             max_amp = float(torch.max(torch.abs(audio_norm))) + 1e-5
             max_shift = min(1, np.log10(1/max_amp))
             log10_vol_shift = random.uniform(-1, max_shift)
@@ -156,7 +154,7 @@ class TextAudioCollate:
         wav_padded.zero_()
         uv_padded.zero_()
         volume_padded.zero_()
-
+        # c, f0, spec, audio_norm, spk, uv,volume
         for i in range(len(ids_sorted_decreasing)):
             row = batch[ids_sorted_decreasing[i]]
 
