@@ -37,7 +37,8 @@ def main(args):
     output_dir.mkdir(parents=True, exist_ok=True)  # 创建文件夹
     spk_info = {}
     # 检测里面是否含有音频文件夹
-    subdirs = [x for x in audio_dir.iterdir() if x.is_dir()]
+    subdirs = [x.name for x in audio_dir.iterdir() if x.is_dir()]
+    print(subdirs)
     if len(subdirs) == 0:
         # 创建一个audio_dir.parent.name的文件夹
         (audio_dir / audio_dir.parent.name).mkdir(parents=True, exist_ok=True)
@@ -66,10 +67,10 @@ def main(args):
         dir_path = audio_dir / spk_name
         out_spk_dir = output_dir / spk_name
         out_spk_dir.mkdir(parents=True, exist_ok=True)  # 创建文件夹
-        files = dir_path.glob("*.wav")  # 仅支持wav格式
+        files = dir_path.glob("*.wav")  # 仅支持wav格式，这个给的完整路径
         file_idx = 0  # 文件序列
         for file_name in files:
-            audio, sr = librosa.load(dir_path / file_name, sr=args.sr)
+            audio, sr = librosa.load(file_name, sr=args.sr)
             chunks = slicer.slice(audio)
             for chunk in chunks:
                 # NOTE: 如果chunk大于10s，下面硬切硬切5s

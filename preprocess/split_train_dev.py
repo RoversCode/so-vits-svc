@@ -16,6 +16,7 @@ import sys
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 # 拿到父目录
 parent_dir = os.path.dirname(cur_dir)
+print(parent_dir)
 sys.path.append(parent_dir)
 import argparse
 import json
@@ -26,7 +27,7 @@ import logging
 from random import shuffle
 from tqdm import tqdm
 from pathlib import Path
-from diffusion.logger import utils
+import utils
 
 pattern = re.compile(r"^[\.a-zA-Z0-9_\/]+$")
 
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 def get_wav_duration(file_path):
     try:
-        with wave.open(file_path, "rb") as wav_file:
+        with wave.open(str(file_path), "rb") as wav_file:
             # 获取音频帧数
             n_frames = wav_file.getnframes()
             # 获取采样率
@@ -54,19 +55,18 @@ if __name__ == "__main__":
         "--speech_encoder",
         type=str,
         default="vec768l12",
-        help="choice a speech encoder|'vec768l12','vec256l9','hubertsoft','whisper-ppg','cnhubertlarge','dphubert','whisper-ppg-large','wavlmbase+'",
+        help=
+        "choice a speech encoder|'vec768l12','vec256l9','hubertsoft','whisper-ppg','cnhubertlarge','dphubert','whisper-ppg-large','wavlmbase+'",
     )
     parser.add_argument(
         "--vol_aug",
         action="store_true",
         help="Whether to use volume embedding and volume augmentation",
     )
-    parser.add_argument(
-        "--tiny", action="store_true", help="Whether to train sovits tiny"
-    )
+    parser.add_argument("--tiny",
+                        action="store_true",
+                        help="Whether to train sovits tiny")
     args = parser.parse_args()
-    # 任务一：在config创建正确的文件夹
-    # 任务二：在对应数据文件夹创建好train_list和val_list
     data_dir = Path(args.data_dir)
     spk_dict = json.load(open(data_dir / "spk_info.json"))
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     spk_id = 0
 
     audio_dir = data_dir / "audio_slice"
-    subdirs = [x for x in audio_dir.iterdir() if x.is_dir()]
+    subdirs = [x.name for x in audio_dir.iterdir() if x.is_dir()]
 
     for spk_name in subdirs:
         if spk_name not in spk_dict:
@@ -89,9 +89,9 @@ if __name__ == "__main__":
         file_paths = (audio_dir / spk_name).glob("*.wav")
         wavs = []
         for file_path in file_paths:
-            if not file_path.endswith("wav"):
+            if not file_path.name.endswith("wav"):
                 continue
-            if file_path.startswith("."):
+            if file_path.name.startswith("."):
                 continue
             if get_wav_duration(file_path) < 0.3:
                 logger.info("Skip too short audio: " + file_path)
@@ -104,57 +104,55 @@ if __name__ == "__main__":
     shuffle(train)
     shuffle(val)
 
-    logger.info("Writing " + args.train_list)
+    logger.info("Writing " + str(data_dir / "train.list"))
     with open(data_dir / "train.list", "w") as f:
         for fname in tqdm(train):
-            f.write(fname.strip() + "\n")
+            f.write(str(fname).strip() + "\n")
 
-    logger.info("Writing " + args.val_list)
+    logger.info("Writing " + str(data_dir / "val.list"))
     with open(data_dir / "val.list", "w") as f:
         for fname in tqdm(val):
-            f.write(fname.strip() + "\n")
+            f.write(str(fname).strip() + "\n")
 
     config_path = Path("configs") / data_dir.name
     config_path.mkdir(parents=True, exist_ok=True)  # 创建文件夹
 
     # 读取base_config
-    sovtis_base_config = utils.load_config(
-        config_path.parent / "sovits_base_config.yaml"
-    )
-    diff_base_config = utils.load_config(
-        config_path.parent / "diffusion_base_config.yaml"
-    )
+
+    sovtis_base_config = utils.get_hparams_from_file(config_path.parent /
+                                                     "sovits_base_config.yaml")
+    diff_base_config = utils.get_hparams_from_file(
+        config_path.parent / "diffusion_base_config.yaml")
 
     diff_base_config.model.n_spk = len(spk_dict)
     diff_base_config.data.encoder = args.speech_encoder
-    diff_base_config.spk = spk_dict
+    diff_base_config.data.spk = spk_dict
 
-    sovtis_base_config.spk = spk_dict
+    sovtis_base_config.data.spk = spk_dict
     sovtis_base_config.model.n_speakers = len(spk_dict)
     sovtis_base_config.model.speech_encoder = args.speech_encoder
 
-    if (
-        args.speech_encoder == "vec768l12"
-        or args.speech_encoder == "dphubert"
-        or args.speech_encoder == "wavlmbase+"
-    ):
+    sovtis_base_config.data.training_files = str(data_dir / "train.list")
+    sovtis_base_config.data.validation_files = str(data_dir / "val.list")
+    diff_base_config.data.training_files = str(data_dir / "train.list")
+    diff_base_config.data.validation_files = str(data_dir / "val.list")
+
+    if (args.speech_encoder == "vec768l12" or args.speech_encoder == "dphubert"
+            or args.speech_encoder == "wavlmbase+"):
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels
-        ) = 768
+            sovtis_base_config.model.gin_channels) = 768
         diff_base_config.data.encoder_out_channels = 768
     elif args.speech_encoder == "vec256l9" or args.speech_encoder == "hubertsoft":
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.gin_channels = 256
         diff_base_config.data.encoder_out_channels = 256
     elif args.speech_encoder == "whisper-ppg" or args.speech_encoder == "cnhubertlarge":
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels
-        ) = 1024
+            sovtis_base_config.model.gin_channels) = 1024
         diff_base_config.data.encoder_out_channels = 1024
     elif args.speech_encoder == "whisper-ppg-large":
 
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels
-        ) = 1280
+            sovtis_base_config.model.gin_channels) = 1280
         diff_base_config.data.encoder_out_channels = 1280
 
     if args.vol_aug:
@@ -164,7 +162,9 @@ if __name__ == "__main__":
         sovtis_base_config.model.filter_channels = 512
 
     logger.info("Writing to configs/config.json")
-    
+
     # 保存为yaml文件
-    utils.save_config(config_path/'sovits_config.yaml', sovtis_base_config)
-    utils.save_config(config_path/'diffusion.yaml', diff_base_config)
+    print(config_path / 'sovits_config.yaml')
+    
+    utils.save_config(config_path / 'sovits_config.yaml', sovtis_base_config)
+    utils.save_config(config_path / 'diffusion.yaml', diff_base_config)

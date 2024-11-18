@@ -20,10 +20,13 @@ from io import BytesIO
 from torch.nn.utils.rnn import pad_sequence
 from modules.mel_processing import spectrogram_torch
 
-
-spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))
-# 重新排列speaker id
-spk2id = {k: i for i, k in enumerate(spk2id.keys())}
+try:
+    spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))
+    # 重新排列speaker id
+    spk2id = {k: i for i, k in enumerate(spk2id.keys())}
+except Exception as ex:
+    print("Failed to load speaker map, ex info {}".format(ex))
+    spk2id = None
 
 
 # 第一道流水线: 过滤
@@ -54,7 +57,8 @@ def gen_spec(data, configs):
             if audio.dim() == 2 and audio.size(0) > 1:
                 audio = audio.mean(0, keepdim=True)  # 单通道
             if sr != configs.sampling_rate:
-                audio = torchaudio.transforms.Resample(sr, configs.sampling_rate)(audio)
+                audio = torchaudio.transforms.Resample(
+                    sr, configs.sampling_rate)(audio)
             audio = audio / torch.max(torch.abs(audio))
             del sample["audio_data"]
             sample["audio"] = audio
@@ -72,7 +76,8 @@ def gen_spec(data, configs):
             yield sample
 
         except Exception as ex:
-            print("Failed to gen_spec {}, ex info {}".format(sample["utt"], ex))
+            print("Failed to gen_spec {}, ex info {}".format(
+                sample["utt"], ex))
 
 
 def gen_vol(data, configs):
@@ -84,7 +89,8 @@ def gen_vol(data, configs):
                 audio2 = audio**2
                 audio2 = torch.nn.functional.pad(
                     audio2,
-                    (int(configs.hop_length // 2), int((configs.hop_length + 1) // 2)),
+                    (int(configs.hop_length // 2),
+                     int((configs.hop_length + 1) // 2)),
                     mode="reflect",
                 )
                 volume = torch.nn.functional.unfold(
@@ -102,20 +108,24 @@ def gen_vol(data, configs):
 def align(data, configs):
     for sample in data:
         try:
-            sample["spk_id"] = spk2id[sample["spk"]]
+            if 'spk' in configs:
+                sample["spk_id"] = configs.spk[sample["spk"]]
+            else:
+                sample["spk_id"] = spk2id[sample["spk"]]
 
             f0 = torch.FloatTensor(sample["f0"].astype(np.float32))
             uv = torch.FloatTensor(sample["uv"].astype(np.float32))
             ssl = torch.FloatTensor(sample["ssl_feature"].astype(np.float32))
             spec = sample["spec"]
             audio = sample["audio"]
-            ssl = utils.repeat_expand_2d(
-                ssl.squeeze(0), f0.shape[0], mode=configs.unit_interpolate_mode
-            )
+            ssl = utils.repeat_expand_2d(ssl.squeeze(0),
+                                         f0.shape[0],
+                                         mode=configs.unit_interpolate_mode)
             lmin = min(ssl.size(-1), sample["spec"].size(-1))  # NOTE: 对齐
-            spec, ssl, f0, uv = spec[:, :lmin], ssl[:, :lmin], f0[:lmin], uv[:lmin]
+            spec, ssl, f0, uv = spec[:, :lmin], ssl[:, :
+                                                    lmin], f0[:lmin], uv[:lmin]
 
-            audio = audio[:, : lmin * configs.hop_length]
+            audio = audio[:, :lmin * configs.hop_length]
 
             # 如果sample中有volume，那么也要对volume进行截取
             if "volume" in sample:
@@ -123,7 +133,8 @@ def align(data, configs):
                 volume = volume[:lmin]
 
             # 增强
-            if random.choice([True, False]) and configs.vol_aug and "volume" in sample:
+            if random.choice([True, False
+                              ]) and configs.vol_aug and "volume" in sample:
                 max_amp = float(torch.max(torch.abs(audio))) + 1e-5
                 max_shift = min(1, np.log10(1 / max_amp))
                 log10_vol_shift = random.uniform(-1, max_shift)
@@ -146,7 +157,8 @@ def align(data, configs):
                     f0[start:end],
                     uv[start:end],
                 )
-                audio = audio[:, start * configs.hop_length : end * configs.hop_length]
+                audio = audio[:, start * configs.hop_length:end *
+                              configs.hop_length]
                 if volume is not None:
                     volume = volume[start:end]
 
@@ -223,7 +235,11 @@ def sort(data, configs):
 
 
 # 第九道流水线
-def batch(data, configs, batch_type='dynamic', max_frames_in_batch=3500, batch_size=1):
+def batch(data,
+          configs,
+          batch_type='dynamic',
+          max_frames_in_batch=3500,
+          batch_size=1):
     """Wrapper for static/dynamic batch
 
     配置文件默认 ->  batch_type: dynamic, max_frames_in_batch: 2000
@@ -231,9 +247,9 @@ def batch(data, configs, batch_type='dynamic', max_frames_in_batch=3500, batch_s
     if batch_type == "static":
         return static_batch(data, batch_size)
     elif batch_type == "dynamic":
-        return dynamic_batch(
-            data, configs, max_frames_in_batch=max_frames_in_batch
-        )
+        return dynamic_batch(data,
+                             configs,
+                             max_frames_in_batch=max_frames_in_batch)
     else:
         print("Unsupported batch type {}".format(configs.batch_type))
 
@@ -269,8 +285,7 @@ def dynamic_batch(data, configs, max_frames_in_batch=12000):
             new_sample_frames = sample["spec"].size(1)
             longest_frames = max(longest_frames, new_sample_frames)
             frames_after_padding = longest_frames * (
-                len(buf) + 1
-            )  # 乘以batch_size表示当前batch的总帧数
+                len(buf) + 1)  # 乘以batch_size表示当前batch的总帧数
             if frames_after_padding > max_frames_in_batch:
                 yield buf
                 buf = [sample]
@@ -278,7 +293,8 @@ def dynamic_batch(data, configs, max_frames_in_batch=12000):
             else:
                 buf.append(sample)
         except Exception as ex:
-            print("Failed to dynamic batch {}, ex info {}".format(sample["utt"], ex))
+            print("Failed to dynamic batch {}, ex info {}".format(
+                sample["utt"], ex))
     if len(buf) > 0:
         yield buf
 
@@ -297,21 +313,25 @@ def padding(data, configs):
         try:
             assert isinstance(sample, list)
             ssl_feature_len = torch.tensor(
-                [x["ssl_feature"].size(1) for x in sample], dtype=torch.int32
-            )  # 每个样本的mel长度
+                [x["ssl_feature"].size(1) for x in sample],
+                dtype=torch.int32)  # 每个样本的mel长度
             order = torch.argsort(ssl_feature_len, descending=True)  # 降序
 
             utts = [sample[i]["utt"] for i in order]
 
-            spec = [sample[i]["spec"].transpose(1, 0) for i in order]  # [t, num_mels]
+            spec = [sample[i]["spec"].transpose(1, 0)
+                    for i in order]  # [t, num_mels]
             spec = pad_sequence(spec, batch_first=True, padding_value=0)
 
             # ssl
-            ssl_feature = [sample[i]["ssl_feature"].transpose(1, 0) for i in order]
-            ssl_length = torch.tensor(
-                [i.size(0) for i in ssl_feature], dtype=torch.int32
-            )  #
-            ssl_feature = pad_sequence(ssl_feature, batch_first=True, padding_value=0)
+            ssl_feature = [
+                sample[i]["ssl_feature"].transpose(1, 0) for i in order
+            ]
+            ssl_length = torch.tensor([i.size(0) for i in ssl_feature],
+                                      dtype=torch.int32)  #
+            ssl_feature = pad_sequence(ssl_feature,
+                                       batch_first=True,
+                                       padding_value=0)
             # f0
             f0 = [sample[i]["f0"] for i in order]
             f0 = pad_sequence(f0, batch_first=True, padding_value=0)

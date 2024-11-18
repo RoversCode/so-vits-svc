@@ -48,11 +48,25 @@ def traverse_dir(
 
 
 class DotDict(dict):
-    def __getattr__(*args):
-        val = dict.get(*args)
-        return DotDict(val) if type(val) is dict else val
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 递归转换所有嵌套的字典为 DotDict
+        for key, value in self.items():
+            if type(value) is dict:
+                self[key] = DotDict(value)
 
-    __setattr__ = dict.__setitem__
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
+
+    def __setattr__(self, key, value):
+        # 如果设置的值是字典，递归转换为 DotDict
+        if type(value) is dict:
+            value = DotDict(value)
+        self[key] = value
+
     __delattr__ = dict.__delitem__
 
 

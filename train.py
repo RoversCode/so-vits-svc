@@ -13,8 +13,8 @@
 import os
 
 os.environ["NCCL_P2P_DISABLE"] = "1"
-# os.environ["LOCAL_RANK"] = "0"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["LOCAL_RANK"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import logging
 import time
 import torch
@@ -25,7 +25,6 @@ import utils
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 # from data_utils import TextAudioCollate, TextAudioSpeakerLoader
@@ -35,19 +34,8 @@ from models import (
 )
 from modules.losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from modules.mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from tools.metadataset import QueueDatasetPipeline
-from tools.data_pipeline import (
-    filter,
-    gen_spec,
-    gen_vol,
-    align,
-    shuffle,
-    sort,
-    batch,
-    padding,
-)
+from tools.train_utils import init_dataloader
 import json
-from functools import partial
 
 
 
@@ -69,16 +57,16 @@ def run():
         if env_name not in os.environ.keys():
             print("加载config中的配置{}".format(str(env_value)))
             os.environ[env_name] = str(env_value)
-    # print(
-    #     "加载环境变量 \nMASTER_ADDR: {},\nMASTER_PORT: {},\nWORLD_SIZE: {},\nRANK: {},\nLOCAL_RANK: {}".format(
-    #         os.environ["MASTER_ADDR"],
-    #         os.environ["MASTER_PORT"],
-    #         os.environ["WORLD_SIZE"],
-    #         os.environ["RANK"],
-    #         os.environ["LOCAL_RANK"],
-    #     )
-    # )
-
+    print(
+        "加载环境变量 \nMASTER_ADDR: {},\nMASTER_PORT: {},\nWORLD_SIZE: {},\nRANK: {},\nLOCAL_RANK: {}".format(
+            os.environ["MASTER_ADDR"],
+            os.environ["MASTER_PORT"],
+            os.environ["WORLD_SIZE"],
+            os.environ["RANK"],
+            os.environ["LOCAL_RANK"],
+        )
+    )
+    
     # for pytorch on win, backend use gloo
     dist.init_process_group(
         backend="nccl" if os.name == "nt" else "nccl",
@@ -95,67 +83,19 @@ def run():
         logger = utils.get_logger(hps.model_dir)
         logger.info(hps)
         # utils.check_git_hash(hps.model_dir)
-        writer = SummaryWriter(log_dir=hps.model_dir)
-        writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
+        writer = SummaryWriter(log_dir=hps.model_dir/'tensorboard')
+        writer_eval = SummaryWriter(log_dir=hps.model_dir/'tensorboard/eval')
 
     # c_padded, f0_padded, spec_padded, wav_padded, spkids, lengths, uv_padded, volume_padded
-    train_dataset = QueueDatasetPipeline(
-        queue_address=("127.0.0.1", 12345),
-        queue_name="get_train_queue",
-        data_pipeline=[
-            filter,
-            gen_spec,
-            gen_vol,
-            align,
-            shuffle,
-            sort,
-            partial(
-                batch,
-                batch_type=hps.data.batch_type,
-                max_frames_in_batch=hps.data.max_frames_in_batch,
-            ),
-            padding,
-        ],
-        configs=hps.data,
-    )
-    train_data_loader = DataLoader(
-        train_dataset,
-        batch_size=None,
-        pin_memory=hps.train.pin_memory,
-        num_workers=hps.train.num_workers,
-        prefetch_factor=hps.train.prefetch,
-    )
+    train_dataset, train_data_loader, dev_dataset, dev_data_loader = init_dataloader(hps, rank)
 
-    if rank == 0:
-        hps.data.batch_type = "static"
-        hps.data.batch_size = 1
-        dev_dataset = QueueDatasetPipeline(
-            queue_address=("127.0.0.1", 12345),
-            queue_name="get_dev_queue",
-            data_pipeline=[
-                filter,
-                gen_spec,
-                gen_vol,
-                align,
-                partial(
-                    batch,
-                    batch_type='static',
-                    batch_size=1,
-                ),
-                padding,
-            ],
-            configs=hps.data,
-        )
-        dev_data_loader = DataLoader(
-            dev_dataset,
-            batch_size=None,
-            # pin_memory=hps.train.pin_memory,
-            # num_workers=hps.train.num_workers,
-            # prefetch_factor=hps.train.prefetch,
-        )
-    spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))
-    hps.model.n_speakers = len(spk2id)
-    del spk2id
+    try:
+        spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))   # 训练底模
+        hps.model.n_speakers = len(spk2id)
+        del spk2id
+    except Exception:
+        pass
+    
     net_g = SynthesizerTrn(
         hps.data.filter_length // 2 + 1,
         hps.train.segment_size // hps.data.hop_length,
@@ -307,8 +247,9 @@ def train_and_evaluate(
     net_d.train()
     with net_g.join():
         for batch_idx, items in enumerate(train_loader):
-            if batch_idx > 0 and batch_idx % hps.train.per_step_epoch == 0:  # yi epoch结束
-                break
+            if hps.train.train_type != 'finetune':
+                if batch_idx > 0 and batch_idx % hps.train.per_step_epoch == 0:  # yi epoch结束
+                    break
             
             if sovits_join(group_join, batch_idx):
                 break
@@ -520,8 +461,9 @@ def evaluate(hps, generator, eval_loader, writer_eval):
     audio_dict = {}
     with torch.no_grad():
         for batch_idx, items in enumerate(eval_loader):
-            if batch_idx > 0 and batch_idx % 10 == 0:  #  评估10条
-                break
+            if hps.train.train_type != 'finetune':
+                if batch_idx > 0 and batch_idx % 10 == 0:  #  评估10条
+                    break
             spec = items["spec"]
             c = items["ssl_feature"]
             lengths = items["ssl_length"]

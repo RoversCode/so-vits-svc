@@ -1,6 +1,6 @@
 name="sunyanzi"
 python preprocess/rename_and_slice.py  \
- --audio_dir ft_ckpt/$name/raw_audio \
+ --audio_dir ckpts/$name/raw_audio \
  --sr 44100 \
  --db_thresh -40 \
  --sliced_min_length 5000 \
