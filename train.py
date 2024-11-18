@@ -149,6 +149,14 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
     net_d.train()
     for batch_idx, items in enumerate(train_loader):
         c, f0, spec, y, spk, lengths, uv,volume = items
+        print(c.shape)  # torch.Size([6, 768, 790])
+        print(f0.shape)  # torch.Size([6, 790])
+        print(spec.shape)  # torch.Size([6, 1025, 790])
+        print(y.shape)  # torch.Size([6, 1, 404480])
+        print(spk.shape) # torch.Size([6, 1])
+        print(lengths.shape)   # torch.Size([6])
+        print(uv.shape)  # torch.Size([6, 790])
+        print(volume.shape)# torch.Size([6, 790])
         g = spk.cuda(rank, non_blocking=True)
         spec, y = spec.cuda(rank, non_blocking=True), y.cuda(rank, non_blocking=True)
         c = c.cuda(rank, non_blocking=True)

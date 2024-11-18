@@ -1,16 +1,36 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File    :   preprocess_flist_config.py
+@Time    :   2024/11/11 22:32:03
+@Author  :   ChengHee
+@Version :   1.0
+@Contact :   liujunjie199810@gmail.com
+@Desc    :   None
+'''
+
+# here put the import lib
+import os
+import sys
+# 获取当前文件的绝对路径
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+# 拿到父目录
+parent_dir = os.path.dirname(cur_dir)
+sys.path.append(parent_dir)
 import argparse
 import json
-import os
 import re
 import wave
+import logging
 from random import shuffle
-
-from loguru import logger
 from tqdm import tqdm
 
 import diffusion.logger.utils as du
 
 pattern = re.compile(r'^[\.a-zA-Z0-9_\/]+$')
+
+logger = logging.getLogger(__name__)
+
 
 def get_wav_duration(file_path):
     try:
@@ -25,6 +45,7 @@ def get_wav_duration(file_path):
         logger.error(f"Reading {file_path}")
         raise e
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train_list", type=str, default="./filelists/train.txt", help="path to train list")
@@ -35,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--tiny", action="store_true", help="Whether to train sovits tiny")
     args = parser.parse_args()
     
-    config_template =  json.load(open("configs_template/config_tiny_template.json")) if args.tiny else json.load(open("configs_template/config_template.json"))
+    config_template = json.load(open("configs_template/config_tiny_template.json")) if args.tiny else json.load(open("configs_template/config_template.json"))
     train = []
     val = []
     idx = 0
@@ -47,7 +68,7 @@ if __name__ == "__main__":
         spk_id += 1
         wavs = []
 
-        for file_name in os.listdir(os.path.join(args.source_dir, speaker)):
+        for file_name in os.listdir(os.path.join(args.source_dir, speaker)):  # audio file
             if not file_name.endswith("wav"):
                 continue
             if file_name.startswith("."):

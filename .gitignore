@@ -165,3 +165,11 @@ pretrain/
 .vscode/launch.json
 
 trained/**/
+backup
+modeldata
+notebook
+eres2net
+raw
+pretrain
+dataset_raw
+raw_data
