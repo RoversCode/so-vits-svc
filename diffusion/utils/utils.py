@@ -1,8 +1,20 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+"""
+@File    :   utils.py
+@Time    :   2024/11/19 16:50:35
+@Author  :   ChengHee
+@Version :   1.0
+@Contact :   liujunjie199810@gmail.com
+@Desc    :   None
+"""
+
+# here put the import lib
 import json
 import os
-
 import torch
 import yaml
+from pathlib import Path
 
 
 def traverse_dir(
@@ -59,7 +71,9 @@ class DotDict(dict):
         try:
             return self[key]
         except KeyError:
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{key}'")
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{key}'"
+            )
 
     def __setattr__(self, key, value):
         # 如果设置的值是字典，递归转换为 DotDict
@@ -115,23 +129,25 @@ def convert_tensor_to_numpy(tensor, is_squeeze=True):
     return tensor.numpy()
 
 
-def load_model(expdir, model, optimizer, name="model", postfix="", device="cpu"):
-    if postfix == "":
-        postfix = "_" + postfix
-    path = os.path.join(expdir, name + postfix)
-    path_pt = traverse_dir(expdir, ["pt"], is_ext=False)
-    global_step = 0
-    if len(path_pt) > 0:
-        steps = [s[len(path) :] for s in path_pt]
-        maxstep = max([int(s) if s.isdigit() else 0 for s in steps])
-        if maxstep >= 0:
-            path_pt = path + str(maxstep) + ".pt"
-        else:
-            path_pt = path + "best.pt"
-        print(" [*] restoring model from", path_pt)
-        ckpt = torch.load(path_pt, map_location=torch.device(device))
-        global_step = ckpt["global_step"]
-        model.load_state_dict(ckpt["model"], strict=False)
+def load_model(model_dir, model, optimizer):
+    if not isinstance(model_dir, Path):
+        model_dir = Path(model_dir)
+
+    f_list = list(model_dir.glob("*.pt"))
+    f_list.sort(
+        key=lambda f: int("".join(filter(str.isdigit, f)))
+    )  # 根据提取的数据，排列
+
+
+    if len(f_list) > 0:
+        ckpt_path = f_list[-1]
+        print(" [*] restoring model from", ckpt_path)
+        ckpt = torch.load(ckpt_path, map_location='cpu')
+        model.load_state_dict(ckpt["model"], strict=True)
         if ckpt.get("optimizer") is not None:
             optimizer.load_state_dict(ckpt["optimizer"])
+        start_epoch = ckpt["epoch"]
+    else:
+        global_step = 1
+
     return global_step, model, optimizer

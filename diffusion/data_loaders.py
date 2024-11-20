@@ -62,7 +62,7 @@ def get_data_loaders(args, whole_audio=False):
         whole_audio=whole_audio,
         extensions=args.data.extensions,
         n_spk=args.model.n_spk,
-        spk=args.spk,
+        spk=args.data.spk,
         device=args.train.cache_device,
         fp16=args.train.cache_fp16,
         unit_interpolate_mode=args.data.unit_interpolate_mode,
@@ -237,25 +237,9 @@ class AudioDataset(Dataset):
         start_frame = int(idx_from / frame_resolution)
         units_frame_len = int(waveform_sec / frame_resolution)
         aug_flag = random.choice([True, False]) and self.use_aug
-        """
-        audio = data_buffer.get('audio')
-        if audio is None:
-            path_audio = os.path.join(self.path_root, 'audio', name) + '.wav'
-            audio, sr = librosa.load(
-                    path_audio, 
-                    sr = self.sample_rate, 
-                    offset = start_frame * frame_resolution,
-                    duration = waveform_sec)
-            if len(audio.shape) > 1:
-                audio = librosa.to_mono(audio)
-            # clip audio into N seconds
-            audio = audio[ : audio.shape[-1] // self.hop_size * self.hop_size]       
-            audio = torch.from_numpy(audio).float()
-        else:
-            audio = audio[start_frame * self.hop_size : (start_frame + units_frame_len) * self.hop_size]
-        """
+        
         # load mel
-        mel_key = "aug_mel" if aug_flag else "mel"
+        mel_key = "aug_mel" if aug_flag else "mel"  # 随机选择增强或者原始mel
         mel = data_buffer.get(mel_key)
         if mel is None:
             mel = name_ext + ".mel.npy"
@@ -266,7 +250,7 @@ class AudioDataset(Dataset):
             mel = mel[start_frame : start_frame + units_frame_len]
 
         # load f0
-        f0 = data_buffer.get("f0")
+        f0 = data_buffer.get("f0")  
         aug_shift = 0
         if aug_flag:
             aug_shift = self.pitch_aug_dict[name_ext]
@@ -287,7 +271,7 @@ class AudioDataset(Dataset):
         units = units[start_frame : start_frame + units_frame_len]
 
         # load volume
-        vol_key = "aug_vol" if aug_flag else "volume"
+        vol_key = "aug_vol" if aug_flag else "volume"  # 
         volume = data_buffer.get(vol_key)
         volume_frames = volume[start_frame : start_frame + units_frame_len]
 

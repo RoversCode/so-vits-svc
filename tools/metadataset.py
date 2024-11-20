@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   metadataset.py
 @Time    :   2024/11/13 21:40:25
 @Author  :   ChengHee
 @Version :   1.0
 @Contact :   liujunjie199810@gmail.com
 @Desc    :   None
-'''
+"""
 
 # here put the import lib
 import random
@@ -21,6 +21,7 @@ from functools import partial
 from torch.utils.data import IterableDataset
 from multiprocessing.managers import BaseManager
 
+
 class QueueManager(BaseManager):
     pass
 
@@ -28,7 +29,7 @@ class QueueManager(BaseManager):
 def QueueDatasetPipeline(
     queue_address=("127.0.0.1", 12345),
     queue_authkey=b"liujunjieabracadabra",
-    queue_name='get_train_queue',
+    queue_name="get_train_queue",
     data_pipeline=None,
     configs=None,
     partition=True,
@@ -37,7 +38,7 @@ def QueueDatasetPipeline(
     buffer_size=1000,
 ):
     """构造支持分布式训练的队列数据集处理流水线"""
-    
+
     # 创建队列数据集
     dataset = QueueDataset(
         address=queue_address,
@@ -98,7 +99,7 @@ class QueueDataset(IterableDataset):
         self,
         address=("", 6789),
         authkey=b"liujunjieabracadabra",
-        queue_name='get_train_queue',
+        queue_name="get_train_queue",
         partition=True,
         max_retries=5,
         retry_delay=5,
@@ -155,7 +156,7 @@ class QueueDataset(IterableDataset):
                 sample = self.queue.get()
                 sample.update(sampler_info)
                 yield sample
-                
+
             except Exception as e:
                 print(f"Error in iteration: {str(e)}")
                 # 尝试重连

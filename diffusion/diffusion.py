@@ -116,7 +116,7 @@ class GaussianDiffusion(nn.Module):
         posterior_variance = (
             betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
         )
-        # above: equal to 1. / (1. / (1. - alpha_cumprod_tm1) + alpha_t / beta_t)
+        # above: equal to 1. / (1. / (1. - alpha"""  """_cumprod_tm1) + alpha_t / beta_t)
         self.register_buffer("posterior_variance", to_torch(posterior_variance))
         # below: log calculation clipped because the posterior variance is 0 at the beginning of the diffusion chain
         self.register_buffer(
@@ -290,11 +290,11 @@ class GaussianDiffusion(nn.Module):
         """
         conditioning diffusion, use fastspeech2 encoder output as the condition
         """
-        cond = condition.transpose(1, 2)
+        cond = condition.transpose(1, 2)  # condition有 ssl, f0, volumn, aug的信息
         b, device = condition.shape[0], condition.device
 
         if not infer:
-            spec = self.norm_spec(gt_spec)
+            spec = self.norm_spec(gt_spec)  # gt_spec -> [B, T, num_mels]
             t = torch.randint(0, self.k_step, (b,), device=device).long()
             norm_spec = spec.transpose(1, 2)[:, None, :, :]  # [B, 1, M, T]
             return self.p_losses(norm_spec, t, cond=cond)
@@ -478,7 +478,7 @@ class GaussianDiffusion(nn.Module):
             x = x.squeeze(1).transpose(1, 2)  # [B, T, M]
             return self.denorm_spec(x)
 
-    def norm_spec(self, x):
+    def norm_spec(self, x):  # * 2 -1，是将值映射到[-1,1]
         return (x - self.spec_min) / (self.spec_max - self.spec_min) * 2 - 1
 
     def denorm_spec(self, x):

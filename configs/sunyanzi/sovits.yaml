@@ -2,7 +2,7 @@ data: !!python/object:utils.HParams
   batch_type: dynamic
   filter_length: 2048
   hop_length: 512
-  max_frames_in_batch: 4200
+  max_frames_in_batch: 3000
   max_wav_value: 32768.0
   mel_fmax: 22050
   mel_fmin: 0.0
@@ -83,14 +83,14 @@ train: !!python/object:utils.HParams
   init_lr_ratio: 1
   keep_ckpts: 3
   learning_rate: 0.0001
-  log_interval: 200
+  log_interval: 100
   lr_decay: 0.999875
   max_speclen: 512
   num_workers: 5
   per_step_epoch: 30000
   pin_memory: true
   port: '6789'
-  prefetch: 40
+  prefetch: 5
   seed: 1234
   segment_size: 10240
   skip_optimizer: false

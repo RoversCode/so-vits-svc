@@ -13,8 +13,8 @@
 import os
 
 os.environ["NCCL_P2P_DISABLE"] = "1"
-os.environ["LOCAL_RANK"] = "0"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["LOCAL_RANK"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import logging
 import time
 import torch
@@ -118,13 +118,13 @@ def run():
     net_d = DDP(net_d, device_ids=[rank])
 
     try:
-        _, _, _, epoch_str = utils.load_checkpoint(
+        _, _, epoch_str = utils.load_checkpoint(
             utils.latest_checkpoint_path(hps.model_dir, "G_*.pth"),
             net_g,
             optim_g,
             hps.train.skip_optimizer,
         )
-        _, _, _, epoch_str = utils.load_checkpoint(
+        _, _, epoch_str = utils.load_checkpoint(
             utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"),
             net_d,
             optim_d,
@@ -175,7 +175,6 @@ def run():
                 hps,
                 [net_g, net_d],
                 [optim_g, optim_d],
-                [scheduler_g, scheduler_d],
                 scaler,
                 [train_data_loader, dev_data_loader],
                 logger,
@@ -189,7 +188,6 @@ def run():
                 hps,
                 [net_g, net_d],
                 [optim_g, optim_d],
-                [scheduler_g, scheduler_d],
                 scaler,
                 [train_data_loader, None],
                 None,
@@ -229,11 +227,10 @@ def sovits_join(group_join, batch_idx):
 
 
 def train_and_evaluate(
-    rank, epoch, hps, nets, optims, schedulers, scaler, loaders, logger, writers, group_join
+    rank, epoch, hps, nets, optims, scaler, loaders, logger, writers, group_join
 ):
     net_g, net_d = nets
     optim_g, optim_d = optims
-    scheduler_g, scheduler_d = schedulers
     train_loader, eval_loader = loaders
     if writers is not None:
         writer, writer_eval = writers
@@ -245,7 +242,7 @@ def train_and_evaluate(
 
     net_g.train()
     net_d.train()
-    with net_g.join():
+    with net_g.join():  # 这里的操作会确保所有进程都执行完成后才继续
         for batch_idx, items in enumerate(train_loader):
             if hps.train.train_type != 'finetune':
                 if batch_idx > 0 and batch_idx % hps.train.per_step_epoch == 0:  # yi epoch结束

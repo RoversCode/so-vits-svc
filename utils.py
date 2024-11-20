@@ -20,11 +20,12 @@ import subprocess
 import sys
 import traceback
 import yaml
-from multiprocessing import cpu_count
 import faiss
 import librosa
 import numpy as np
 import torch
+from multiprocessing import cpu_count
+from pathlib import Path
 from scipy.io.wavfile import read
 from sklearn.cluster import MiniBatchKMeans
 from torch.nn import functional as F
@@ -191,11 +192,12 @@ def load_checkpoint(checkpoint_path,
                     skip_optimizer=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    iteration = checkpoint_dict['iteration']  # epoch
-    learning_rate = checkpoint_dict['learning_rate']
+    iteration = checkpoint_dict['iteration'] 
     if optimizer is not None and not skip_optimizer and checkpoint_dict[
             'optimizer'] is not None:
         optimizer.load_state_dict(checkpoint_dict['optimizer'])
+    else:
+        iteration = 1
     saved_state_dict = checkpoint_dict['model']
     model = model.to(list(saved_state_dict.values())[0].dtype)
     if hasattr(model, 'module'):
@@ -224,7 +226,7 @@ def load_checkpoint(checkpoint_path,
     print("load ")
     logger.info("Loaded checkpoint '{}' (iteration {})".format(
         checkpoint_path, iteration))
-    return model, optimizer, learning_rate, iteration
+    return model, optimizer, iteration
 
 
 def save_checkpoint(model, optimizer, learning_rate, iteration,
@@ -387,29 +389,31 @@ def load_filepaths_and_text(filename, split="|"):
     return filepaths_and_text
 
 
-def get_hparams(init=True):
+def get_hparams():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name',
+    parser.add_argument('--exp_name',
                         default="sunyanzi",
+                        type=str,
+                        help='本次实验名')
+    parser.add_argument('--target_model',
+                        default="diffusion",  # diffusion
                         type=str,
                         help='本次实验名')
 
     args = parser.parse_args()
-    from pathlib import Path
-    config_path = Path(f"configs/{args.model_name}/sovits_config.yaml")
-    
+    config_path = Path(f"configs/{args.exp_name}/{args.target_model}.yaml")
+    # 创建exp_name文件夹
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
         print('加载自定配置：', str(config_path))
         # 加载基础配置
         config = yaml.unsafe_load(open(str(config_path)))
     else:
         print('加载基础配置：', 'configs/sovits_base_config.yaml')
-        config = yaml.unsafe_load(open('configs/sovits_base_config.yaml'))
-    
-    # 创建exp_name文件夹
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    model_dir = Path(f"ckpts/{args.model_name}/sovits")
+        config = yaml.unsafe_load(open(f"configs/{args.target_model}_base_config.yaml"))
+        
+    model_dir = Path(f"ckpts/{args.exp_name}/{args.target_model}")
+    model_dir.mkdir(parents=True, exist_ok=True)
     hparams = HParams(**config)
     hparams.model_dir = model_dir
     return hparams

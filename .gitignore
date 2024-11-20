@@ -174,3 +174,5 @@ pretrain
 dataset_raw
 raw_data
 ckpts
+Data
+raw_audios

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   train_utils.py
 @Time    :   2024/11/18 22:48:48
 @Author  :   ChengHee
 @Version :   1.0
 @Contact :   liujunjie199810@gmail.com
 @Desc    :   None
-'''
+"""
 
 # here put the import lib
 from functools import partial
@@ -24,6 +24,7 @@ from tools.data_pipeline import (
     padding,
 )
 from torch.utils.data import DataLoader
+
 
 def init_dataloader(hps, rank):
     if hps.train.train_type == "base":
@@ -67,7 +68,7 @@ def init_dataloader(hps, rank):
                     align,
                     partial(
                         batch,
-                        batch_type='static',
+                        batch_type="static",
                         batch_size=1,
                     ),
                     padding,
@@ -122,7 +123,7 @@ def init_dataloader(hps, rank):
                     align,
                     partial(
                         batch,
-                        batch_type='static',
+                        batch_type="static",
                         batch_size=1,
                     ),
                     padding,

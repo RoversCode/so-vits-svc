@@ -4,5 +4,5 @@ torchrun \
     --nproc_per_node=1 \
     --master_port=6778 \
     --master_addr='localhost' \
-    train.py \
+    train_diff.py \
     --model_name $exp_name

@@ -12,6 +12,7 @@
 # here put the import lib
 import os
 import sys
+
 # 获取当前文件的绝对路径
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 # 拿到父目录
@@ -55,26 +56,26 @@ if __name__ == "__main__":
         "--speech_encoder",
         type=str,
         default="vec768l12",
-        help=
-        "choice a speech encoder|'vec768l12','vec256l9','hubertsoft','whisper-ppg','cnhubertlarge','dphubert','whisper-ppg-large','wavlmbase+'",
+        help="choice a speech encoder|'vec768l12','vec256l9','hubertsoft','whisper-ppg','cnhubertlarge','dphubert','whisper-ppg-large','wavlmbase+'",
     )
     parser.add_argument(
         "--vol_aug",
         action="store_true",
         help="Whether to use volume embedding and volume augmentation",
     )
-    parser.add_argument("--tiny",
-                        action="store_true",
-                        help="Whether to train sovits tiny")
+    parser.add_argument(
+        "--train_type",
+        type=str,
+        default="finetune",
+        help="Whether to use volume embedding and volume augmentation",
+    )
+    parser.add_argument(
+        "--tiny", action="store_true", help="Whether to train sovits tiny"
+    )
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
     spk_dict = json.load(open(data_dir / "spk_info.json"))
 
-    # config_template = (
-    #     json.load(open("configs_template/config_tiny_template.json"))
-    #     if args.tiny
-    #     else json.load(open("configs_template/config_template.json"))
-    # )
     train = []
     val = []
     idx = 0
@@ -119,10 +120,12 @@ if __name__ == "__main__":
 
     # 读取base_config
 
-    sovtis_base_config = utils.get_hparams_from_file(config_path.parent /
-                                                     "sovits_base_config.yaml")
+    sovtis_base_config = utils.get_hparams_from_file(
+        config_path.parent / "sovits_base_config.yaml"
+    )
     diff_base_config = utils.get_hparams_from_file(
-        config_path.parent / "diffusion_base_config.yaml")
+        config_path.parent / "diffusion_base_config.yaml"
+    )
 
     diff_base_config.model.n_spk = len(spk_dict)
     diff_base_config.data.encoder = args.speech_encoder
@@ -136,27 +139,39 @@ if __name__ == "__main__":
     sovtis_base_config.data.validation_files = str(data_dir / "val.list")
     diff_base_config.data.training_files = str(data_dir / "train.list")
     diff_base_config.data.validation_files = str(data_dir / "val.list")
+    
+    sovtis_base_config.train.train_type = args.train_type  # 训练类型
+    diff_base_config.train.train_type = args.train_type
 
-    if (args.speech_encoder == "vec768l12" or args.speech_encoder == "dphubert"
-            or args.speech_encoder == "wavlmbase+"):
+    if (
+        args.speech_encoder == "vec768l12"
+        or args.speech_encoder == "dphubert"
+        or args.speech_encoder == "wavlmbase+"
+    ):
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels) = 768
+            sovtis_base_config.model.gin_channels
+        ) = 768
         diff_base_config.data.encoder_out_channels = 768
     elif args.speech_encoder == "vec256l9" or args.speech_encoder == "hubertsoft":
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.gin_channels = 256
         diff_base_config.data.encoder_out_channels = 256
     elif args.speech_encoder == "whisper-ppg" or args.speech_encoder == "cnhubertlarge":
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels) = 1024
+            sovtis_base_config.model.gin_channels
+        ) = 1024
         diff_base_config.data.encoder_out_channels = 1024
     elif args.speech_encoder == "whisper-ppg-large":
 
         sovtis_base_config.model.ssl_dim = sovtis_base_config.model.filter_channels = (
-            sovtis_base_config.model.gin_channels) = 1280
+            sovtis_base_config.model.gin_channels
+        ) = 1280
         diff_base_config.data.encoder_out_channels = 1280
 
     if args.vol_aug:
-        sovtis_base_config.train.vol_aug = sovtis_base_config.model.vol_embedding = True
+        sovtis_base_config.train.vol_aug = sovtis_base_config.model.vol_embedding = sovtis_base_config.data.vol_aug = True
+    else:
+        sovtis_base_config.train.vol_aug = sovtis_base_config.model.vol_embedding = sovtis_base_config.data.vol_aug = False
+    
 
     if args.tiny:
         sovtis_base_config.model.filter_channels = 512
@@ -164,7 +179,7 @@ if __name__ == "__main__":
     logger.info("Writing to configs/config.json")
 
     # 保存为yaml文件
-    print(config_path / 'sovits_config.yaml')
-    
-    utils.save_config(config_path / 'sovits_config.yaml', sovtis_base_config)
-    utils.save_config(config_path / 'diffusion.yaml', diff_base_config)
+    print(config_path / "sovits_config.yaml")
+
+    utils.save_config(config_path / "sovits.yaml", sovtis_base_config)
+    utils.save_config(config_path / "diffusion.yaml", diff_base_config)

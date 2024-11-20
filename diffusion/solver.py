@@ -6,8 +6,8 @@ import torch
 from torch import autocast
 from torch.cuda.amp import GradScaler
 
-from diffusion.logger import utils
-from diffusion.logger.saver import Saver
+from diffusion.utils import utils
+from diffusion.utils.saver import Saver
 
 
 def test(args, model, vocoder, loader_test, saver):
@@ -127,6 +127,16 @@ def train(
     saver.log_info("epoch|batch_idx/num_batches|output_dir|batch/s|lr|time|step")
     for epoch in range(args.train.epochs):
         for batch_idx, data in enumerate(loader_train):
+            '''
+                mel=mel,
+                f0=f0_frames,
+                volume=volume_frames,
+                units=units,
+                spk_id=spk_id,
+                aug_shift=aug_shift,
+                name=name,
+                name_ext=name_ext,
+            '''
             saver.global_step_increment()
             optimizer.zero_grad()
 
@@ -192,7 +202,6 @@ def train(
                 )
 
                 saver.log_value({"train/loss": loss.item()})
-
                 saver.log_value({"train/lr": current_lr})
 
             # validation
