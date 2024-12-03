@@ -147,7 +147,7 @@ def get_args():
         "-dm",
         "--diffusion_model_path",
         type=str,
-        default="ckpts/sunyanzi/diffusion/model_0.pt",
+        default="ckpts/sunyanzi/diffusion/diff_2001.pt",
         help="扩散模型路径",
     )
     parser.add_argument(
@@ -161,7 +161,7 @@ def get_args():
         "-ks",
         "--k_step",
         type=int,
-        default=500,
+        default=100,
         help="扩散步数，越大越接近扩散模型的结果，默认100",
     )
     parser.add_argument(

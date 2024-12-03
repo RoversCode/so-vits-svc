@@ -14,6 +14,7 @@ import random
 import math
 import torch
 import librosa
+import utils
 import numpy as np
 import torch.distributed as dist
 from pathlib import Path
@@ -79,10 +80,6 @@ class DistributedSampler:
             data = data[: self.num_workers]
         data = data[self.worker_id :: self.num_workers]
         return data
-
-
-import utils
-
 
 class DataList(IterableDataset):
 

@@ -16,3 +16,7 @@ f0, uv
 1. 歌声数据处理
   gt singer done
   pop 
+
+
+
+find /datadisk/liujunjie/so-vits-svc/ckpts/sunyanzi/audio_slice/sunyanzi -type f ! -name "*.wav" -delete

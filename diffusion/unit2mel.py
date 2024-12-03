@@ -30,7 +30,7 @@ def load_model_vocoder(
         config_file = config_path
 
     with open(config_file, "r") as config:
-        args = yaml.safe_load(config)
+        args = yaml.unsafe_load(config)
     args = DotDict(args)
     
     # load vocoder

@@ -1,6 +1,5 @@
 import os
 import sys
-
 # 获取当前文件的绝对路径
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 # 拿到父目录
@@ -40,7 +39,7 @@ def process_one(
     audio_norm = audio_norm.unsqueeze(0)
     soft_path = file_path.parent / (file_path.stem + "_ssl.pt")
     f0_path = file_path.parent / (file_path.stem + "_f0.npy")
-    spec_path = file_path.parent / (file_path.stem + "_spec.pt")
+    # spec_path = file_path.parent / (file_path.stem + "_spec.pt")
     strat_time = time.time()
     if not os.path.exists(soft_path) or not os.path.exists(f0_path):
         wav16k = librosa.resample(wav, orig_sr=sampling_rate, target_sr=16000)
@@ -58,35 +57,35 @@ def process_one(
     f0_time = time.time() - strat_time - ssl_time
     logger.info(f"Process {file_path.name} F0耗时 {f0_time:.2f}s")
 
-    if not spec_path.exists():
-        # Process spectrogram
-        # The following code can't be replaced by torch.FloatTensor(wav)
-        # because load_wav_to_torch return a tensor that need to be normalized
-        if sr != hps.data.sampling_rate:
-            raise ValueError(
-                "{} SR doesn't match target {} SR".format(sr, hps.data.sampling_rate)
-            )
-        # audio_norm = audio / hps.data.max_wav_value
-        spec = spectrogram_torch(
-            audio_norm,
-            hps.data.filter_length,
-            hps.data.sampling_rate,
-            hps.data.hop_length,
-            hps.data.win_length,
-            center=False,
-        )
-        spec = torch.squeeze(spec, 0)
-        torch.save(spec, spec_path)
-    spec_time = time.time() - strat_time - ssl_time - f0_time
-    # logger.info(f"Process {filename} 频谱耗时 {spec_time:.2f}s")
+    # if not spec_path.exists():
+    #     # Process spectrogram
+    #     # The following code can't be replaced by torch.FloatTensor(wav)
+    #     # because load_wav_to_torch return a tensor that need to be normalized
+    #     if sr != hps.data.sampling_rate:
+    #         raise ValueError(
+    #             "{} SR doesn't match target {} SR".format(sr, hps.data.sampling_rate)
+    #         )
+    #     # audio_norm = audio / hps.data.max_wav_value
+    #     spec = spectrogram_torch(
+    #         audio_norm,
+    #         hps.data.filter_length,
+    #         hps.data.sampling_rate,
+    #         hps.data.hop_length,
+    #         hps.data.win_length,
+    #         center=False,
+    #     )
+    #     spec = torch.squeeze(spec, 0)
+    #     torch.save(spec, spec_path)
+    # spec_time = time.time() - strat_time - ssl_time - f0_time
+    # # logger.info(f"Process {filename} 频谱耗时 {spec_time:.2f}s")
 
-    if hps.model.vol_embedding:
-        volume_path = file_path.parent / (file_path.stem + "_vol.npy")
-        volume_extractor = utils.Volume_Extractor(hop_length)
-        if not volume_path.exists():
-            volume = volume_extractor.extract(audio_norm)
-            np.save(volume_path, volume.to("cpu").numpy())
-    vol_time = time.time() - strat_time - ssl_time - f0_time - spec_time
+    # if hps.model.vol_embedding:
+    #     volume_path = file_path.parent / (file_path.stem + "_vol.npy")
+    #     volume_extractor = utils.Volume_Extractor(hop_length)
+    #     if not volume_path.exists():
+    #         volume = volume_extractor.extract(audio_norm)
+    #         np.save(volume_path, volume.to("cpu").numpy())
+    # vol_time = time.time() - strat_time - ssl_time - f0_time - spec_time
     # logger.info(f"Process {filename} 音量耗时 {vol_time:.2f}s")
     # if diff:
     #     mel_path = file_path.parent / (file_path.stem + "_mel.npy")

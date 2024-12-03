@@ -51,10 +51,18 @@ def init_dataloader(hps, rank):
                 gen_vol,
                 shuffle,
                 sort,
-                partial(
-                    batch,
-                    batch_type=hps.data.batch_type,
-                    max_frames_in_batch=hps.data.max_frames_in_batch,
+                (
+                    partial(
+                        batch,
+                        batch_type=hps.data.batch_type,
+                        max_frames_in_batch=hps.data.max_frames_in_batch,
+                    )
+                    if hps.data.batch_type == "dynamic"
+                    else partial(
+                        batch,
+                        batch_type=hps.data.batch_type,
+                        batch_size=hps.data.batch_size,
+                    )
                 ),
                 padding,
             ],
@@ -63,9 +71,9 @@ def init_dataloader(hps, rank):
         train_data_loader = DataLoader(
             train_dataset,
             batch_size=None,
-            # pin_memory=hps.train.pin_memory,
-            # num_workers=hps.train.num_workers,
-            # prefetch_factor=hps.train.prefetch,
+            pin_memory=hps.train.pin_memory,
+            num_workers=hps.train.num_workers,
+            prefetch_factor=hps.train.prefetch,
         )
         if rank == 0:
             hps.data.batch_type = "static"
