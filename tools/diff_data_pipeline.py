@@ -38,7 +38,7 @@ def filter(data, configs):
         # assert "src" in sample
         # url = sample["src"]  # parquet文件路径
         try:
-            if sample["dur"] < 0.5:
+            if sample["dur"] < 2:
                 continue
             if sample["dur"] > 30:
                 continue
@@ -276,37 +276,43 @@ def padding(data, configs):
             order = torch.argsort(ssl_feature_len, descending=False)  # 降序
             # dur = [sample[i]["dur"] for i in order]
             keyshift = [sample[i]["keyshift"] for i in order]
-            # 随机增强
-            if random.uniform(0, 1) < 0.5:
-                aug_flag = True
-                # vol mel 
-                mel_spec = [sample[i]["aug_mel_spec"] for i in order]  # [t, num_mels]
-                volume = [sample[i]["aug_volume"] for i in order]
-            else:
-                aug_flag = False
-                mel_spec = [sample[i]["mel_spec"] for i in order]
-                volume = [sample[i]["volume"] for i in order]
-                
+            
             f0 = [torch.FloatTensor(sample[i]["f0"].astype(np.float32)) for i in order]
             ssl = [sample[i]["ssl_feature"] for i in order]  # [768, t]
+            aug_mel_spec = [sample[i]["aug_mel_spec"] for i in order]  # [t, num_mels]
+            aug_volume = [sample[i]["aug_volume"] for i in order]
+            mel_spec = [sample[i]["mel_spec"] for i in order]
+            volume = [sample[i]["volume"] for i in order]
             frame_num = mel_spec[0].shape[0]
-            
             for i in range(0, len(sample)):
+                if random.uniform(0, 1) < 0.5:
+                    aug_flag = True
+                else:
+                    aug_flag = False        
                 cur_frame_num = mel_spec[i].shape[0]
                 if cur_frame_num == frame_num:  # 等长
                     if aug_flag:
                         f0[i] = 2 ** (keyshift[i] / 12) * f0[i]
+                        mel_spec[i] = aug_mel_spec[i]
+                        volume[i] = aug_volume[i]
+                        # keyshift 保持原样
+                    else:
+                        keyshift[i] = 0
                     continue
                 # 随机筛选frame_num
-                start_idx = np.random.randint(0, cur_frame_num-frame_num)
+                start_idx = np.random.randint(0, cur_frame_num-frame_num) # 随机截取
                 
-                mel_spec[i] = mel_spec[i][start_idx:start_idx+frame_num, :]
-                volume[i] = volume[i][start_idx:start_idx+frame_num]
-                ssl[i] = ssl[i][:, start_idx:start_idx+frame_num]
                 if aug_flag:
+                    mel_spec[i] = aug_mel_spec[i][start_idx:start_idx+frame_num, :]
+                    volume[i] = aug_volume[i][start_idx:start_idx+frame_num]
                     f0[i] = 2 ** (keyshift[i] / 12) * f0[i][start_idx : start_idx + frame_num]
                 else:
+                    mel_spec[i] = mel_spec[i][start_idx:start_idx+frame_num, :]
+                    volume[i] = volume[i][start_idx:start_idx+frame_num]
                     f0[i] = f0[i][start_idx:start_idx+frame_num]
+                    keyshift[i] = 0
+                ssl[i] = ssl[i][:, start_idx:start_idx+frame_num]
+                
             spk_id = [sample[i]["spk_id"] for i in order]
             spk_id = torch.tensor(spk_id, dtype=torch.int64)
             

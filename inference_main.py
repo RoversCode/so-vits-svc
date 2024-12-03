@@ -1,7 +1,18 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+"""
+@File    :   inference_main.py
+@Time    :   2024/11/21 16:50:42
+@Author  :   ChengHee
+@Version :   1.0
+@Contact :   liujunjie199810@gmail.com
+@Desc    :   None
+"""
+
+# here put the import lib
 import logging
-
 import soundfile
-
+import argparse
 from inference import infer_tool
 from inference.infer_tool import Svc
 from spkmix import spk_mix_map
@@ -10,20 +21,21 @@ logging.getLogger("numba").setLevel(logging.WARNING)
 chunks_dict = infer_tool.read_temp("inference/chunks_temp.json")
 
 
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description="sovits4 inference")
-
+def get_args():
     # 一定要设置的部分
+    parser = argparse.ArgumentParser(description="sovits4 inference")
     parser.add_argument(
-        "-m", "--model_path", type=str, default="logs/44k/G_37600.pth", help="模型路径"
+        "-m",
+        "--model_path",
+        type=str,
+        default="ckpts/sunyanzi/sovits/G_7965.pth",
+        help="模型路径",
     )
     parser.add_argument(
         "-c",
         "--config_path",
         type=str,
-        default="logs/44k/config.json",
+        default="configs/sunyanzi/sovits.yaml",
         help="配置文件路径",
     )
     parser.add_argument(
@@ -38,7 +50,7 @@ def main():
         "--clean_names",
         type=str,
         nargs="+",
-        default=["君の知らない物語-src.wav"],
+        default=["notebook/sovits_svc/像我的我.wav"],
         help="wav文件名列表，放在raw文件夹下",
     )
     parser.add_argument(
@@ -54,7 +66,7 @@ def main():
         "--spk_list",
         type=str,
         nargs="+",
-        default=["buyizi"],
+        default=["sunyanzi"],
         help="合成目标说话人名称",
     )
 
@@ -91,7 +103,7 @@ def main():
         "-f0p",
         "--f0_predictor",
         type=str,
-        default="pm",
+        default="crepe",
         help="选择F0预测器,可选择crepe,pm,dio,harvest,rmvpe,fcpe默认为pm(注意：crepe为原F0使用均值滤波器)",
     )
     parser.add_argument(
@@ -105,7 +117,7 @@ def main():
         "-shd",
         "--shallow_diffusion",
         action="store_true",
-        default=False,
+        default=True,
         help="是否使用浅层扩散，使用后可解决一部分电音问题，默认关闭，该选项打开时，NSF_HIFIGAN增强器将会被禁止",
     )
     parser.add_argument(
@@ -135,21 +147,21 @@ def main():
         "-dm",
         "--diffusion_model_path",
         type=str,
-        default="logs/44k/diffusion/model_0.pt",
+        default="ckpts/sunyanzi/diffusion/model_0.pt",
         help="扩散模型路径",
     )
     parser.add_argument(
         "-dc",
         "--diffusion_config_path",
         type=str,
-        default="logs/44k/diffusion/config.yaml",
+        default="configs/sunyanzi/diffusion.yaml",
         help="扩散模型配置文件路径",
     )
     parser.add_argument(
         "-ks",
         "--k_step",
         type=int,
-        default=100,
+        default=500,
         help="扩散步数，越大越接近扩散模型的结果，默认100",
     )
     parser.add_argument(
@@ -197,7 +209,7 @@ def main():
         help="推理音频pad秒数，由于未知原因开头结尾会有异响，pad一小段静音段后就不会出现",
     )
     parser.add_argument(
-        "-wf", "--wav_format", type=str, default="flac", help="音频输出格式"
+        "-wf", "--wav_format", type=str, default="wav", help="音频输出格式"
     )
     parser.add_argument(
         "-lgr",
@@ -220,33 +232,58 @@ def main():
         default=0.05,
         help="F0过滤阈值，只有使用crepe时有效. 数值范围从0-1. 降低该值可减少跑调概率，但会增加哑音",
     )
-
     args = parser.parse_args()
+    return args
 
-    clean_names = args.clean_names
-    trans = args.trans
+
+def main():
+    args = get_args()
+    clean_names = args.clean_names  # wav文件名列表，放在raw文件夹下
+    trans = args.trans  # 音高调整，支持正负（半音）
     spk_list = args.spk_list
     slice_db = args.slice_db
     wav_format = args.wav_format
     auto_predict_f0 = args.auto_predict_f0
-    cluster_infer_ratio = args.cluster_infer_ratio
-    noice_scale = args.noice_scale
-    pad_seconds = args.pad_seconds
-    clip = args.clip
-    lg = args.linear_gradient
-    lgr = args.linear_gradient_retain
-    f0p = args.f0_predictor
-    enhance = args.enhance
-    enhancer_adaptive_key = args.enhancer_adaptive_key
-    cr_threshold = args.f0_filter_threshold
+    cluster_infer_ratio = (
+        args.cluster_infer_ratio
+    )  # 聚类方案或特征检索占比，范围0-1，若没有训练聚类模型或特征检索则默认0即可
+    noice_scale = args.noice_scale  # 噪音级别，会影响咬字和音质，较为玄学
+    pad_seconds = (
+        args.pad_seconds
+    )  # 推理音频pad秒数，由于未知原因开头结尾会有异响，pad一小段静音段后就不会出现
+    clip = args.clip  # 音频强制切片，默认0为自动切片，单位为秒/s
+    lg = (
+        args.linear_gradient
+    )  # 两段音频切片的交叉淡入长度，如果强制切片后出现人声不连贯可调整该数值，如果连贯建议采用默认值0，单位为秒
+    lgr = (
+        args.linear_gradient_retain
+    )  # 自动音频切片后，需要舍弃每段切片的头尾。该参数设置交叉长度保留的比例，范围0-1,左开右闭
+    f0p = (
+        args.f0_predictor
+    )  # 选择F0预测器,可选择crepe,pm,dio,harvest,rmvpe,fcpe默认为pm(注意：crepe为原F0使用均值滤波器)
+    enhance = (
+        args.enhance
+    )  # 是否使用NSF_HIFIGAN增强器,该选项对部分训练集少的模型有一定的音质增强效果，但是对训练好的模型有反面效果，默认关
+    enhancer_adaptive_key = (
+        args.enhancer_adaptive_key
+    )  # 使增强器适应更高的音域(单位为半音数)|默认为0
+    cr_threshold = (
+        args.f0_filter_threshold
+    )  # F0过滤阈值，只有使用crepe时有效. 数值范围从0-1. 降低该值可减少跑调概率，但会增加哑音
     diffusion_model_path = args.diffusion_model_path
     diffusion_config_path = args.diffusion_config_path
     k_step = args.k_step
     only_diffusion = args.only_diffusion
-    shallow_diffusion = args.shallow_diffusion
-    use_spk_mix = args.use_spk_mix
-    second_encoding = args.second_encoding
-    loudness_envelope_adjustment = args.loudness_envelope_adjustment
+    shallow_diffusion = (
+        args.shallow_diffusion
+    )  # 是否使用浅层扩散，使用后可解决一部分电音问题，默认关闭，该选项打开时，NSF_HIFIGAN增强器将会被禁止
+    use_spk_mix = args.use_spk_mix  # 是否使用角色融合
+    second_encoding = (
+        args.second_encoding
+    )  # 二次编码，浅扩散前会对原始音频进行二次编码，玄学选项，有时候效果好，有时候效果差
+    loudness_envelope_adjustment = (
+        args.loudness_envelope_adjustment
+    )  # 输入源响度包络替换输出响度包络融合比例，越靠近1越使用输出响度包络
 
     if cluster_infer_ratio != 0:
         if args.cluster_model_path == "":
@@ -262,7 +299,6 @@ def main():
     svc_model = Svc(
         args.model_path,
         args.config_path,
-        args.device,
         args.cluster_model_path,
         enhance,
         diffusion_model_path,
@@ -282,7 +318,7 @@ def main():
 
     infer_tool.fill_a_to_b(trans, clean_names)
     for clean_name, tran in zip(clean_names, trans):
-        raw_audio_path = f"raw/{clean_name}"
+        raw_audio_path = clean_name
         if "." not in raw_audio_path:
             raw_audio_path += ".wav"
         infer_tool.format_wav(raw_audio_path)
@@ -317,7 +353,8 @@ def main():
                 isdiffusion = "diff"
             if use_spk_mix:
                 spk = "spk_mix"
-            res_path = f"results/{clean_name}_{key}_{spk}{cluster_name}_{isdiffusion}_{f0p}.{wav_format}"
+            res_path = f"{clean_name}_{key}_{spk}{cluster_name}_{isdiffusion}_{f0p}.{wav_format}"
+            print(f'保存：{res_path}')
             soundfile.write(res_path, audio, svc_model.target_sample, format=wav_format)
             svc_model.clear_empty()
 

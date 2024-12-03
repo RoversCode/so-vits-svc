@@ -128,7 +128,6 @@ class Svc(object):
         self,
         net_g_path,
         config_path,
-        device=None,
         cluster_model_path="logs/44k/kmeans_10000.pt",
         nsf_hifigan_enhance=False,
         diffusion_model_path="logs/44k/diffusion/model_0.pt",
@@ -142,16 +141,15 @@ class Svc(object):
         self.only_diffusion = only_diffusion
         self.shallow_diffusion = shallow_diffusion
         self.feature_retrieval = feature_retrieval
-        if device is None:
-            self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.dev = torch.device(device)
+        self.nsf_hifigan_enhance = nsf_hifigan_enhance
+        self.dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.net_g_ms = None
+
         if not self.only_diffusion:
             self.hps_ms = utils.get_hparams_from_file(config_path, True)
             self.target_sample = self.hps_ms.data.sampling_rate
             self.hop_size = self.hps_ms.data.hop_length
-            self.spk2id = self.hps_ms.spk
+            self.spk2id = self.hps_ms.data.spk
             self.unit_interpolate_mode = (
                 self.hps_ms.data.unit_interpolate_mode
                 if self.hps_ms.data.unit_interpolate_mode is not None
@@ -168,8 +166,7 @@ class Svc(object):
                 else "vec768l12"
             )
 
-        self.nsf_hifigan_enhance = nsf_hifigan_enhance
-        if self.shallow_diffusion or self.only_diffusion:
+        if self.shallow_diffusion or self.only_diffusion:  # 启动扩散模型
             if os.path.exists(diffusion_model_path) and os.path.exists(
                 diffusion_model_path
             ):
@@ -511,8 +508,8 @@ class Svc(object):
             if len(self.spk2id) == 1:
                 spk = self.spk2id.keys()[0]
                 use_spk_mix = False
-        wav_path = Path(raw_audio_path).with_suffix(".wav")
-        chunks = slicer.cut(wav_path, db_thresh=slice_db)
+        wav_path = raw_audio_path
+        chunks = slicer.cut(wav_path, db_thresh=slice_db) # 切片
         audio_data, audio_sr = slicer.chunks2audio(wav_path, chunks)
         per_size = int(clip_seconds * audio_sr)
         lg_size = int(lg_num * audio_sr)
@@ -604,10 +601,10 @@ class Svc(object):
                         f"###=====segment clip start, {round(len(dat) / audio_sr, 3)}s======"
                     )
                 # padd
-                pad_len = int(audio_sr * pad_seconds)
-                dat = np.concatenate([np.zeros([pad_len]), dat, np.zeros([pad_len])])
+                pad_len = int(audio_sr * pad_seconds)  # pad 0.5秒
+                dat = np.concatenate([np.zeros([pad_len]), dat, np.zeros([pad_len])])  # 前后加上了0.5秒静音
                 raw_path = io.BytesIO()
-                soundfile.write(raw_path, dat, audio_sr, format="wav")
+                soundfile.write(raw_path, dat, audio_sr, format="wav") # 写道内存中
                 raw_path.seek(0)
                 out_audio, out_sr, out_frame = self.infer(
                     spk,

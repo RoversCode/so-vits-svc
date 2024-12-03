@@ -58,19 +58,19 @@ def get_data_loaders(args, whole_audio=False):
         waveform_sec=args.data.duration,
         hop_size=args.data.block_size,
         sample_rate=args.data.sampling_rate,
-        load_all_data=args.train.cache_all_data,
+        load_all_data=True,
         whole_audio=whole_audio,
         extensions=args.data.extensions,
         n_spk=args.model.n_spk,
         spk=args.data.spk,
-        device=args.train.cache_device,
-        fp16=args.train.cache_fp16,
+        device='cpu',
+        fp16=True,
         unit_interpolate_mode=args.data.unit_interpolate_mode,
         use_aug=True,
     )
     loader_train = torch.utils.data.DataLoader(
         data_train,
-        batch_size=args.train.batch_size if not whole_audio else 1,
+        batch_size=48 if not whole_audio else 1,
         shuffle=True,
         num_workers=args.train.num_workers if args.train.cache_device == "cpu" else 0,
         persistent_workers=(
@@ -83,7 +83,7 @@ def get_data_loaders(args, whole_audio=False):
         waveform_sec=args.data.duration,
         hop_size=args.data.block_size,
         sample_rate=args.data.sampling_rate,
-        load_all_data=args.train.cache_all_data,
+        load_all_data=True,
         whole_audio=True,
         spk=args.spk,
         extensions=args.data.extensions,
@@ -131,26 +131,27 @@ class AudioDataset(Dataset):
             print("Load the f0, volume data filelists:", filelists)
         with open(filelists, "r") as f:
             self.paths = f.read().splitlines()
+        from pathlib import Path
         for name_ext in tqdm(self.paths, total=len(self.paths)):
-            path_audio = name_ext
+            path_audio = Path(name_ext)
             duration = librosa.get_duration(filename=path_audio, sr=self.sample_rate)
 
-            path_f0 = name_ext + ".f0.npy"
+            path_f0 = path_audio.parent / (path_audio.name + ".f0.npy")
             f0, _ = np.load(path_f0, allow_pickle=True)
             f0 = (
                 torch.from_numpy(np.array(f0, dtype=float))
                 .float()
                 .unsqueeze(-1)
                 .to(device)
-            )
+            )  # 1312, 1
 
-            path_volume = name_ext + ".vol.npy"
+            path_volume = path_audio.parent / (path_audio.name + ".vol.npy")
             volume = np.load(path_volume)
-            volume = torch.from_numpy(volume).float().unsqueeze(-1).to(device)
+            volume = torch.from_numpy(volume).float().unsqueeze(-1).to(device)  # 1312, 1
 
-            path_augvol = name_ext + ".aug_vol.npy"
+            path_augvol = path_audio.parent / (path_audio.name + ".aug_vol.npy")
             aug_vol = np.load(path_augvol)
-            aug_vol = torch.from_numpy(aug_vol).float().unsqueeze(-1).to(device)
+            aug_vol = torch.from_numpy(aug_vol).float().unsqueeze(-1).to(device)  # 1312, 1
 
             if n_spk is not None and n_spk > 1:
                 spk_name = name_ext.split("/")[-2]
@@ -170,22 +171,22 @@ class AudioDataset(Dataset):
                     audio = librosa.to_mono(audio)
                 audio = torch.from_numpy(audio).to(device)
                 """
-                path_mel = name_ext + ".mel.npy"
+                path_mel = path_audio.parent / (path_audio.name + ".mel.npy")
                 mel = np.load(path_mel)
-                mel = torch.from_numpy(mel).to(device)
+                mel = torch.from_numpy(mel).to(device)  # [1312, 128]
 
-                path_augmel = name_ext + ".aug_mel.npy"
+                path_augmel = path_audio.parent / (path_audio.name + ".aug_mel.npy")
                 aug_mel, keyshift = np.load(path_augmel, allow_pickle=True)
                 aug_mel = np.array(aug_mel, dtype=float)
                 aug_mel = torch.from_numpy(aug_mel).to(device)
                 self.pitch_aug_dict[name_ext] = keyshift
 
-                path_units = name_ext + ".soft.pt"
+                path_units = path_audio.parent / (path_audio.name + ".soft.pt")
                 units = torch.load(path_units).to(device)
-                units = units[0]
+                units = units[0]  # [768, 761]
                 units = repeat_expand_2d(
                     units, f0.size(0), unit_interpolate_mode
-                ).transpose(0, 1)
+                ).transpose(0, 1)  # shape -> [f0.size(0), 768]
 
                 if fp16:
                     mel = mel.half()
@@ -203,7 +204,7 @@ class AudioDataset(Dataset):
                     "spk_id": spk_id,
                 }
             else:
-                path_augmel = name_ext + ".aug_mel.npy"
+                path_augmel = path_audio.parent / (path_audio.name + ".aug_mel.npy")
                 aug_mel, keyshift = np.load(path_augmel, allow_pickle=True)
                 self.pitch_aug_dict[name_ext] = keyshift
                 self.data_buffer[name_ext] = {

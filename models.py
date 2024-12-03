@@ -608,44 +608,68 @@ class SynthesizerTrn(nn.Module):
     def forward(
         self, c, f0, uv, spec, g=None, c_lengths=None, spec_lengths=None, vol=None
     ):
+        if torch.isnan(c).any():
+            print(f"NaN detected in 原始c")
+        if torch.isnan(f0).any():
+            print(f"NaN detected in 原始f0")
+        if torch.isnan(spec).any():
+            print(f"NaN detected in 原始spec")
+        if torch.isnan(uv).any():
+            print(f"NaN detected in 原始uv")
+        if torch.isnan(vol).any():
+            print(f"NaN detected in 原始vol")
         # c, f0, spec, audio_norm, spk, uv,volume
         g = self.emb_g(g).transpose(1, 2)
-
+        if torch.isnan(g).any():
+            print(f"NaN detected in emb_g")
         # vol proj
         vol = (
             self.emb_vol(vol[:, :, None]).transpose(1, 2)
             if vol is not None and self.vol_embedding
             else 0
         )
+        if torch.isnan(vol).any():
+            print(f"NaN detected in emb_vol")
 
         # ssl prenet
         x_mask = torch.unsqueeze(commons.sequence_mask(c_lengths, c.size(2)), 1).to(
             c.dtype
         )
         x = self.pre(c) * x_mask + self.emb_uv(uv.long()).transpose(1, 2) + vol  # sll + uv + vol
+        if torch.isnan(x).any():
+            print(f"NaN detected in x")
 
         # f0 predict
         if self.use_automatic_f0_prediction:
             lf0 = 2595.0 * torch.log10(1.0 + f0.unsqueeze(1) / 700.0) / 500
             norm_lf0 = utils.normalize_f0(lf0, x_mask, uv)
             pred_lf0 = self.f0_decoder(x, norm_lf0, x_mask, spk_emb=g)
+            if torch.isnan(lf0).any():
+                print(f"NaN detected in f0_decoder")
         else:
             lf0 = 0
             norm_lf0 = 0
             pred_lf0 = 0
         # encoder
         z_ptemp, m_p, logs_p, _ = self.enc_p(x, x_mask, f0=f0_to_coarse(f0))
+        if torch.isnan(m_p).any():
+            print(f"NaN detected in enc_p")
         z, m_q, logs_q, spec_mask = self.enc_q(spec, spec_lengths, g=g)
+        if torch.isnan(z).any():
+            print(f"NaN detected in enc_q")
 
         # flow
         z_p = self.flow(z, spec_mask, g=g)
+        if torch.isnan(z_p).any():
+            print(f"NaN detected in flow")
         z_slice, pitch_slice, ids_slice = commons.rand_slice_segments_with_pitch(
             z, f0, spec_lengths, self.segment_size
         )
 
         # nsf decoder
         o = self.dec(z_slice, g=g, f0=pitch_slice)
-
+        if torch.isnan(o).any():
+            print(f"NaN detected in o")
         return (
             o,
             ids_slice,

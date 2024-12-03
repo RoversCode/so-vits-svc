@@ -11,6 +11,10 @@
 
 # here put the import lib
 import os
+
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["LOCAL_RANK"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import json
 import torch
 import logging
@@ -19,10 +23,8 @@ import torch.distributed as dist
 import matplotlib.pyplot as plt
 from torch.cuda.amp import GradScaler, autocast
 from torch.optim import lr_scheduler
-from diffusion.solver import train
 from diffusion.unit2mel import Unit2Mel
 from utils import get_hparams, get_logger, latest_checkpoint_path, load_checkpoint
-from diffusion.utils import utils
 from tools.diff_train_utils import init_dataloader
 from vdecoder.nsf_hifigan.models import load_config
 from torch.utils.tensorboard import SummaryWriter
@@ -80,9 +82,12 @@ def run():
     )
 
     try:
-        spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))  # 训练底模
-        hps.model.n_speakers = len(spk2id)
-        del spk2id
+        if hps.train.train_type == "base":
+            spk2id = json.load(open("Data/sovits_svc/sing_spk_info.json", "r"))
+            hps.model.n_speakers = len(spk2id)
+            del spk2id
+        else:
+            hps.model.n_speakers = len(hps.data.spk)
     except Exception:
         pass
 
@@ -111,13 +116,15 @@ def run():
     optimizer = torch.optim.AdamW(model.parameters())
 
     try:
-        _, _, _, epoch_str = load_checkpoint(
-            latest_checkpoint_path(hps.model_dir, "diff_*.pth"),
+        model_path = latest_checkpoint_path(hps.model_dir, "diff_*.pt")
+        _, _, epoch_str = load_checkpoint(
+            model_path,
             model,
             optimizer,
             hps.train.skip_optimizer,
         )
-    except Exception:
+        global_step = int(model_path.stem.split("_")[1]) + 1
+    except:
         print("load old checkpoint failed...")
         epoch_str = 1
         global_step = 0
@@ -138,12 +145,14 @@ def run():
 
     model = DDP(model, device_ids=[rank])
 
-    scheduler = lr_scheduler.ExponentialLR(
-        optimizer,
-        gamma=hps.train.gamma,
-        last_epoch=epoch_str - 2,  # 如果epoch是从1开始计数
+    # scheduler = lr_scheduler.ExponentialLR(
+    #     optimizer,
+    #     gamma=hps.train.gamma,
+    #     last_epoch=epoch_str - 2,  # 如果epoch是从1开始计数
+    # )
+    scheduler = lr_scheduler.StepLR(
+        optimizer, step_size=1000000, gamma=hps.train.gamma, last_epoch=epoch_str - 2
     )
-
     scaler = GradScaler(enabled=hps.train.fp16_run)
     for epoch in range(epoch_str, hps.train.epochs):
         train_dataset.set_epoch(epoch)  # 重新设置随机方式
@@ -260,30 +269,33 @@ def train_and_evaluate(
                     writer.add_scalar("train/lr", current_lr, global_step)
 
             global_step += 1
-            break
     try:
         dist.barrier()
     except RuntimeError as e:
         logger.info("except RuntimeError as e: {}".format(e))
 
-    if rank == 0:
+    if rank == 0 and epoch % hps.train.per_epoch_save == 0:
 
         evaluate(rank, hps, model, eval_loader, writer_eval)
         # 保存模型
-        checkpoint_path = hps.model_dir / f"diff_{global_step}.pth"
+        checkpoint_path = hps.model_dir / f"diff_{global_step}.pt"
         logger.info(
             "Saving model and optimizer state at iteration {} to {}".format(
-                epoch, checkpoint_path))
-        if hasattr(model, 'module'):
+                epoch, checkpoint_path
+            )
+        )
+        if hasattr(model, "module"):
             state_dict = model.module.state_dict()
         else:
             state_dict = model.state_dict()
         torch.save(
             {
-                'model': state_dict,
-                'iteration': epoch,
-                'optimizer': optimizer.state_dict()
-            }, checkpoint_path)
+                "model": state_dict,
+                "iteration": epoch,
+                "optimizer": optimizer.state_dict(),
+            },
+            checkpoint_path,
+        )
 
 
 def evaluate(rank, hps, model, eval_loader, writer_eval):
@@ -323,93 +335,10 @@ def evaluate(rank, hps, model, eval_loader, writer_eval):
             fig = plt.figure(figsize=(12, 9))
             plt.pcolor(spec.T, vmin=vmin, vmax=vmax)
             plt.tight_layout()
-            writer_eval.add_figure(f'spec_{batch_idx}', fig, global_step)
+            writer_eval.add_figure(f"spec_{batch_idx}", fig, global_step)
             plt.close(fig)  # 添加这行，及时清理图像
     model.train()
 
-
-# def test(args, model, vocoder, loader_test, saver):
-#     print(" [*] testing...")
-#     model.eval()
-
-#     # losses
-#     test_loss = 0.0
-
-#     # intialization
-#     num_batches = len(loader_test)
-#     rtf_all = []
-
-#     # run
-#     with torch.no_grad():
-#         for bidx, data in enumerate(loader_test):
-#             fn = data["name"][0].split("/")[-1]
-#             speaker = data["name"][0].split("/")[-2]
-#             print("--------")
-#             print("{}/{} - {}".format(bidx, num_batches, fn))
-
-#             # unpack data
-#             for k in data.keys():
-#                 if not k.startswith("name"):
-#                     data[k] = data[k].to(args.device)
-#             print(">>", data["name"][0])
-
-#             # forward
-#             st_time = time.time()
-#             mel = model(
-#                 data["units"],
-#                 data["f0"],
-#                 data["volume"],
-#                 data["spk_id"],
-#                 gt_spec=None if model.k_step_max == model.timesteps else data["mel"],
-#                 infer=True,
-#                 infer_speedup=args.infer.speedup,
-#                 method=args.infer.method,
-#                 k_step=model.k_step_max,
-#             )
-#             signal = vocoder.infer(mel, data["f0"])
-#             ed_time = time.time()
-
-#             # RTF
-#             run_time = ed_time - st_time
-#             song_time = signal.shape[-1] / args.data.sampling_rate
-#             rtf = run_time / song_time
-#             print("RTF: {}  | {} / {}".format(rtf, run_time, song_time))
-#             rtf_all.append(rtf)
-
-#             # loss
-#             for i in range(args.train.batch_size):
-#                 loss = model(
-#                     data["units"],
-#                     data["f0"],
-#                     data["volume"],
-#                     data["spk_id"],
-#                     gt_spec=data["mel"],
-#                     infer=False,
-#                     k_step=model.k_step_max,
-#                 )
-#                 test_loss += loss.item()
-
-#             # log mel
-#               # spec, spec_out
-#             saver.log_spec(f"{speaker}_{fn}.wav", data["mel"], mel)
-
-#             # log audi
-#             path_audio = data["name_ext"][0]
-#             audio, sr = librosa.load(path_audio, sr=args.data.sampling_rate)
-#             if len(audio.shape) > 1:
-#                 audio = librosa.to_mono(audio)
-#             audio = torch.from_numpy(audio).unsqueeze(0).to(signal)
-#             saver.log_audio(
-#                 {f"{speaker}_{fn}_gt.wav": audio, f"{speaker}_{fn}_pred.wav": signal}
-#             )
-#     # report
-#     test_loss /= args.train.batch_size
-#     test_loss /= num_batches
-
-#     # check
-#     print(" [test_loss] test_loss:", test_loss)
-#     print(" Real Time Factor", np.mean(rtf_all))
-#     return test_loss
 
 if __name__ == "__main__":
     run()

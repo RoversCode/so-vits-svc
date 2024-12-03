@@ -12,8 +12,8 @@
 # here put the import lib
 import os
 
-os.environ["NCCL_P2P_DISABLE"] = "1"
-os.environ["WANDB_DISABLED"] = "true"
+# os.environ["NCCL_P2P_DISABLE"] = "1"
+# os.environ["WANDB_DISABLED"] = "true"
 import multiprocessing
 import torch
 import torchaudio
@@ -29,9 +29,9 @@ from vencoder.ContentVec768L12 import ContentVec768L12
 from modules.F0Predictor.RMVPEF0Predictor import RMVPEF0Predictor
 
 
-def data_producer(queue, data_path="Data/raw_text.list"):
+def data_producer(queue, data_path="Data/sovits_svc/train.list"):
     # spk
-    spks = json.load(open("Data/sovits_svc/speaker_map.json"))
+    spks = json.load(open("Data/sovits_svc/sing_spk_info.json"))
     # 读取数据
     all_raw_data = []
     with open(data_path, "r", encoding="utf8") as fin:
@@ -48,6 +48,8 @@ def data_producer(queue, data_path="Data/raw_text.list"):
                 if line[2] not in spks:  # 不在spk中，直接跳过
                     continue
                 sample["utt"] = line[0]
+                if sample["utt"].endswith(".wav"):
+                    sample["utt"] = sample["utt"].replace(".wav", "")
                 sample["language"] = line[1]
                 sample["dur"] = float(line[-1])
                 sample["spk"] = line[2]
@@ -100,13 +102,28 @@ def processer(
                     file_path = os.path.join(
                         "Data/wavetts_22050", sample["utt"] + ".wav"
                     )
+                elif os.path.exists(
+                    os.path.join("Data/sing_raw", sample["utt"] + ".wav")
+                ):
+                    file_path = os.path.join(
+                        "Data/sing_raw", sample["utt"] + ".wav"
+                    )
                 else:
-                    assert ValueError(f"找不到音频文件{sample['utt']}")
+                    assert False, f"找不到音频文件{sample['utt']}"
 
+                ssl_t_path = os.path.join(
+                    "Data/sovits_svc/ssls", sample["utt"] + ".wav_ssl.pt"
+                )
+                f0_t_path = os.path.join("Data/sovits_svc/f0s", sample["utt"] + ".wav_f0.npy")
                 ssl_path = os.path.join(
                     "Data/sovits_svc/ssls", sample["utt"] + "_ssl.pt"
                 )
                 f0_path = os.path.join("Data/sovits_svc/f0s", sample["utt"] + "_f0.npy")
+                if os.path.exists(ssl_t_path):
+                    # 改名
+                    os.rename(ssl_t_path, ssl_path)
+                if os.path.exists(f0_t_path):
+                    os.rename(f0_t_path, f0_path)
                 audio_rb = open(file_path, "rb").read()
                 results["audio_data"] = audio_rb
                 if not os.path.exists(ssl_path) or not os.path.exists(f0_path):
@@ -152,8 +169,8 @@ def processer(
 # 存入encodec的内容
 data_product = multiprocessing.Queue(512)
 final_queue = multiprocessing.Queue(512)
-dev_product = multiprocessing.Queue(24)
-dev_queue = multiprocessing.Queue(24)
+dev_product = multiprocessing.Queue(10)
+dev_queue = multiprocessing.Queue(10)
 # 读取配置
 config = yaml.safe_load(open("configs/sovits_base_config.yaml", "r"))["data"]
 
@@ -191,11 +208,6 @@ if __name__ == "__main__":
                     sampling_rate=config["sampling_rate"],
                 )
             ).start()
-
-    # for i in range(1, 3):
-    #     for _ in range(2):
-    #         time.sleep(1)
-    #         multiprocessing.Process(target=processer(i, hop_length=config['hop_length'], sampling_rate=config['sampling_rate'])).start()
 
     class QueueManager(BaseManager):
         pass

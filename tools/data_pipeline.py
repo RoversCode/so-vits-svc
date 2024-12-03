@@ -21,7 +21,7 @@ from torch.nn.utils.rnn import pad_sequence
 from modules.mel_processing import spectrogram_torch
 
 try:
-    spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))
+    spk2id = json.load(open("Data/sovits_svc/sing_spk_info.json", "r"))
     # 重新排列speaker id
     spk2id = {k: i for i, k in enumerate(spk2id.keys())}
 except Exception as ex:
@@ -60,6 +60,10 @@ def gen_spec(data, configs):
                 audio = torchaudio.transforms.Resample(
                     sr, configs.sampling_rate)(audio)
             audio = audio / torch.max(torch.abs(audio))
+            # 添加音频数值检查
+            if torch.isnan(audio).any() or torch.isinf(audio).any():
+                print(f"Invalid audio values in {sample['utt']}, skipping...")
+                continue
             del sample["audio_data"]
             sample["audio"] = audio
             spec = spectrogram_torch(
@@ -70,6 +74,10 @@ def gen_spec(data, configs):
                 configs.win_length,
                 center=False,
             )
+            # 检查频谱图是否有NaN
+            if torch.isnan(spec).any() or torch.isinf(spec).any():
+                print(f"Invalid spectrogram values in {sample['utt']}, skipping...")
+                continue
             spec = torch.squeeze(spec, 0)  # [freq, time]
             sample["spec"] = spec
 
@@ -98,7 +106,15 @@ def gen_vol(data, configs):
                     (1, configs.hop_length),
                     stride=configs.hop_length,
                 )[:, :, :n_frames].mean(dim=1)[0]
-                volume = torch.sqrt(volume)
+                # 添加小的epsilon避免零值
+                volume = torch.sqrt(volume + 1e-8)
+                # 检查计算出的音量是否有效
+                if torch.isnan(volume).any() or torch.isinf(volume).any():
+                    print(f"Invalid volume values, skipping...")
+                    continue
+                    
+                # 可以选择对音量进行裁剪
+                volume = torch.clamp(volume, min=0.0, max=1.0)
                 sample["volume"] = volume
             yield sample
         except Exception as ex:
@@ -148,6 +164,12 @@ def align(data, configs):
                     configs.win_length,
                     center=False,
                 )[0]
+                if torch.isnan(spec).any() or torch.isinf(spec).any():
+                    print(f"Invalid spectrogram values after volume augmentation, skipping...")
+                    continue
+                if torch.isnan(volume).any() or torch.isinf(volume).any():
+                    print(f"Invalid volume values after volume augmentation, skipping...")
+                    continue
             if spec.shape[1] > 800:
                 start = random.randint(0, spec.shape[1] - 800)
                 end = start + 790

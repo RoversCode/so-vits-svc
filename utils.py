@@ -192,12 +192,14 @@ def load_checkpoint(checkpoint_path,
                     skip_optimizer=False):
     assert os.path.isfile(checkpoint_path)
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    iteration = checkpoint_dict['iteration'] 
+    if 'iteration' in checkpoint_dict:
+        iteration = checkpoint_dict['iteration'] 
+    else:
+        iteration = 1
     if optimizer is not None and not skip_optimizer and checkpoint_dict[
             'optimizer'] is not None:
         optimizer.load_state_dict(checkpoint_dict['optimizer'])
-    else:
-        iteration = 1
+        
     saved_state_dict = checkpoint_dict['model']
     model = model.to(list(saved_state_dict.values())[0].dtype)
     if hasattr(model, 'module'):
@@ -219,6 +221,7 @@ def load_checkpoint(checkpoint_path,
                     % k)
                 logger.info("%s is not in the checkpoint" % k)
                 new_state_dict[k] = v
+            iteration = 1
     if hasattr(model, 'module'):
         model.module.load_state_dict(new_state_dict)
     else:
@@ -226,7 +229,7 @@ def load_checkpoint(checkpoint_path,
     print("load ")
     logger.info("Loaded checkpoint '{}' (iteration {})".format(
         checkpoint_path, iteration))
-    return model, optimizer, iteration
+    return model, optimizer, iteration,
 
 
 def save_checkpoint(model, optimizer, learning_rate, iteration,
@@ -242,8 +245,7 @@ def save_checkpoint(model, optimizer, learning_rate, iteration,
         {
             'model': state_dict,
             'iteration': iteration,
-            'optimizer': optimizer.state_dict(),
-            'learning_rate': learning_rate
+            'optimizer': optimizer.state_dict()
         }, checkpoint_path)
 
 
@@ -310,10 +312,10 @@ def summarize(writer,
         writer.add_audio(k, v, global_step, audio_sampling_rate)
 
 
-def latest_checkpoint_path(dir_path, regex="G_*.pth"):
-    f_list = glob.glob(os.path.join(dir_path, regex))
+def latest_checkpoint_path(dir_path, regex="G_*.pt"):
+    f_list = list(dir_path.glob(regex))
     f_list.sort(
-        key=lambda f: int("".join(filter(str.isdigit, f))))  # 根据提取的数据，排列
+        key=lambda f: int("".join(filter(str.isdigit, str(f)))))  # 根据提取的数据，排列
     x = f_list[-1]  # 取最新的ckpt
     print(x)
     return x
@@ -396,7 +398,7 @@ def get_hparams():
                         type=str,
                         help='本次实验名')
     parser.add_argument('--target_model',
-                        default="diffusion",  # diffusion
+                        default="diffusion",  # diffusion sovits
                         type=str,
                         help='本次实验名')
 
@@ -431,7 +433,7 @@ def get_hparams_from_dir(model_dir):
 
 
 def get_hparams_from_file(config_path, infer_mode=False):
-    config = yaml.safe_load(open(config_path))
+    config = yaml.unsafe_load(open(config_path))
     hparams = HParams(**config) if not infer_mode else InferHParams(**config)
     return hparams
 
@@ -500,8 +502,8 @@ def repeat_expand_2d_left(content, target_len):
 # mode : 'nearest'| 'linear'| 'bilinear'| 'bicubic'| 'trilinear'| 'area'
 def repeat_expand_2d_other(content, target_len, mode='nearest'):
     # content : [h, t]
-    content = content[None, :, :]
-    target = F.interpolate(content, size=target_len, mode=mode)[0]
+    content = content[None, :, :] # # 1. 增加一个维度，变成 [1, 768, 761]
+    target = F.interpolate(content, size=target_len, mode=mode)[0] # 2. 插值，变成 [1, 768, target_len]
     return target
 
 

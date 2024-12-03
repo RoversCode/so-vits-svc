@@ -1,7 +1,8 @@
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import glob
 import json
 import logging
-import os
 import re
 import subprocess
 import sys

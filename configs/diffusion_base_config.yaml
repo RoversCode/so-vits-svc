@@ -36,9 +36,13 @@ train:
   log_interval: 10
   batch_size: 48
   epochs: 100000
+  per_epoch_save: 5
   num_workers: 4
+  prefetch: 5
+  pin_memory: true
   save_opt: false
   weight_decay: 0
+  cache_fp16: true
   gamma: 0.9899
   lr: 0.0001
   skip_optimizer: false

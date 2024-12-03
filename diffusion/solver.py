@@ -59,7 +59,7 @@ def test(args, model, vocoder, loader_test, saver):
             rtf_all.append(rtf)
 
             # loss
-            for i in range(args.train.batch_size):
+            for i in range(48):
                 loss = model(
                     data["units"],
                     data["f0"],
@@ -84,7 +84,7 @@ def test(args, model, vocoder, loader_test, saver):
                 {f"{speaker}_{fn}_gt.wav": audio, f"{speaker}_{fn}_pred.wav": signal}
             )
     # report
-    test_loss /= args.train.batch_size
+    test_loss /= 48
     test_loss /= num_batches
 
     # check
@@ -116,14 +116,7 @@ def train(
     model.train()
     saver.log_info("======= start training =======")
     scaler = GradScaler()
-    if args.train.amp_dtype == "fp32":
-        dtype = torch.float32
-    elif args.train.amp_dtype == "fp16":
-        dtype = torch.float16
-    elif args.train.amp_dtype == "bf16":
-        dtype = torch.bfloat16
-    else:
-        raise ValueError(" [x] Unknown amp_dtype: " + args.train.amp_dtype)
+    dtype = torch.float32
     saver.log_info("epoch|batch_idx/num_batches|output_dir|batch/s|lr|time|step")
     for epoch in range(args.train.epochs):
         for batch_idx, data in enumerate(loader_train):
@@ -148,14 +141,14 @@ def train(
             # forward
             if dtype == torch.float32:
                 loss = model(
-                    data["units"].float(),
-                    data["f0"],
-                    data["volume"],
+                    data["units"].float(),  # [129, 768]
+                    data["f0"],  # [129, 1]
+                    data["volume"],  # [129, 1]
                     data["spk_id"],
-                    aug_shift=data["aug_shift"],
-                    gt_spec=data["mel"].float(),
+                    aug_shift=data["aug_shift"], # [1, 1]
+                    gt_spec=data["mel"].float(),  # [129, 128]
                     infer=False,
-                    k_step=model.k_step_max,
+                    k_step=model.k_step_max, # 1000
                 )
             else:
                 with autocast(device_type=args.device, dtype=dtype):
@@ -185,15 +178,15 @@ def train(
                 scheduler.step()
 
             # log loss
-            if saver.global_step % args.train.interval_log == 0:
+            if saver.global_step % 10 == 0:
                 current_lr = optimizer.param_groups[0]["lr"]
                 saver.log_info(
                     "epoch: {} | {:3d}/{:3d} | {} | batch/s: {:.2f} | lr: {:.6} | loss: {:.3f} | time: {} | step: {}".format(
                         epoch,
                         batch_idx,
                         num_batches,
-                        args.env.expdir,
-                        args.train.interval_log / saver.get_interval_time(),
+                        "ckpts/sunyanzi/diffusion",
+                        10 / saver.get_interval_time(),
                         current_lr,
                         loss.item(),
                         saver.get_total_time(),
@@ -205,13 +198,13 @@ def train(
                 saver.log_value({"train/lr": current_lr})
 
             # validation
-            if saver.global_step % args.train.interval_val == 0:
-                optimizer_save = optimizer if args.train.save_opt else None
+            if saver.global_step % 2000 == 0:
+                optimizer_save = None
 
                 # save latest
                 saver.save_model(model, optimizer_save, postfix=f"{saver.global_step}")
-                last_val_step = saver.global_step - args.train.interval_val
-                if last_val_step % args.train.interval_force_save != 0:
+                last_val_step = saver.global_step - 2000
+                if last_val_step % 5000 != 0:
                     saver.delete_model(postfix=f"{last_val_step}")
 
                 # run testing set

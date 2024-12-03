@@ -14,7 +14,7 @@ import os
 
 os.environ["NCCL_P2P_DISABLE"] = "1"
 # os.environ["LOCAL_RANK"] = "0"
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import logging
 import time
 import torch
@@ -90,9 +90,12 @@ def run():
     train_dataset, train_data_loader, dev_dataset, dev_data_loader = init_dataloader(hps, rank)
 
     try:
-        spk2id = json.load(open("Data/sovits_svc/speaker_map.json", "r"))   # 训练底模
-        hps.model.n_speakers = len(spk2id)
-        del spk2id
+        if hps.train.train_type == 'base':
+            spk2id = json.load(open("Data/sovits_svc/sing_spk_info.json", "r"))   # 训练底模
+            hps.model.n_speakers = len(spk2id)
+            del spk2id
+        else:
+            hps.model.n_speakers = len(hps.data.spk)
     except Exception:
         pass
     
@@ -114,6 +117,11 @@ def run():
         betas=hps.train.betas,
         eps=hps.train.eps,
     )
+    # for name, param in net_g.named_parameters():
+    #     if 'emb_g' not in name:
+    #         param.requires_grad = False
+    #     else:
+    #         print(f'保持{name}层可训练')
     net_g = DDP(net_g, device_ids=[rank])  # , find_unused_parameters=True)
     net_d = DDP(net_d, device_ids=[rank])
 
@@ -124,7 +132,7 @@ def run():
             optim_g,
             hps.train.skip_optimizer,
         )
-        _, _, epoch_str = utils.load_checkpoint(
+        _, _, _ = utils.load_checkpoint(
             utils.latest_checkpoint_path(hps.model_dir, "D_*.pth"),
             net_d,
             optim_d,
@@ -132,7 +140,7 @@ def run():
         )
         epoch_str = max(epoch_str, 1)
         name = utils.latest_checkpoint_path(hps.model_dir, "D_*.pth")
-        global_step = int(name[name.rfind("_") + 1 : name.rfind(".")]) + 1
+        global_step = int(name.stem.split("_")[-1]) + 1
         # global_step = (epoch_str - 1) * len(train_loader)
     except Exception:
         print("load old checkpoint failed...")
