@@ -70,11 +70,11 @@ def gen_spec(data, configs):
             audio, sr = torchaudio.load(BytesIO(sample["audio_data"]))
             if audio.dim() == 2 and audio.size(0) > 1:
                 audio = audio.mean(0, keepdim=True)  # 单通道
-            if sr != configs.data.sampling_rate:
+            if sr != vocoder_config.sampling_rate:
                 audio = torchaudio.transforms.Resample(
-                    sr, vocoder_config.sampling_rate
+                    sr, vocoder_config.sampling_rate, lowpass_filter_width=128
                 )(audio)
-            audio = audio / torch.max(torch.abs(audio))
+            # audio = audio / torch.max(torch.abs(audio))
             del sample["audio_data"]
             sample["audio"] = audio
 
@@ -86,9 +86,11 @@ def gen_spec(data, configs):
             max_shift = min(1, np.log10(1 / max_amp))
             log10_vol_shift = random.uniform(-1, max_shift)
             keyshift = random.uniform(-5, 5)
-            aug_mel_t = stft.get_mel(audio * (10**log10_vol_shift), keyshift=keyshift).transpose(1, 2)
-            
-            sample['keyshift'] = keyshift
+            aug_mel_t = stft.get_mel(
+                audio * (10**log10_vol_shift), keyshift=keyshift
+            ).transpose(1, 2)
+
+            sample["keyshift"] = keyshift
             sample["aug_mel_spec"] = aug_mel_t.squeeze()
             sample["log10_vol_shift"] = log10_vol_shift
             yield sample
@@ -99,30 +101,33 @@ def gen_spec(data, configs):
 
 def gen_vol(data, configs):
     def extract_volume(audio, hop_length):
-        n_frames = int(audio.size(-1) // hop_length)
+        n_frames = int(len(audio) // hop_length)
         audio2 = audio**2
-        audio2 = torch.nn.functional.pad(
-            audio2,
-            (int(hop_length // 2), int((hop_length + 1) // 2)),
-            mode="reflect",
+        audio2 = np.pad(
+            audio2, (int(hop_length // 2), int((hop_length + 1) // 2)), mode="reflect"
         )
-        volume = torch.nn.functional.unfold(
-            audio2[:, None, None, :],
-            (1, hop_length),
-            stride=hop_length,
-        )[:, :, :n_frames].mean(dim=1)[0]
-        volume = torch.sqrt(volume)
+        volume = np.array(
+            [
+                np.mean(audio2[int(n * hop_length) : int((n + 1) * hop_length)])
+                for n in range(n_frames)
+            ]
+        )
+        volume = np.sqrt(volume)
+        volume = torch.tensor(volume, dtype=torch.float32)
         return volume
 
     for sample in data:
         try:
             audio = sample["audio"]
-            sample["volume"] = extract_volume(audio, configs.data.hop_length)
+            sample["volume"] = extract_volume(
+                audio.squeeze().numpy(), configs.data.hop_length
+            )
 
             # aug vol
             log10_vol_shift = sample["log10_vol_shift"]
             sample["aug_volume"] = extract_volume(
-                audio * (10**log10_vol_shift), configs.data.hop_length
+                (audio * (10**log10_vol_shift)).squeeze().numpy(),
+                configs.data.hop_length,
             )
             del sample["log10_vol_shift"]
             yield sample
@@ -255,7 +260,7 @@ def padding(data, configs):
     # c_padded, f0_padded, spec_padded, wav_padded, spkids, lengths, uv_padded, volume_padded
     Returns:
         Iterable[Tuple(keys, feats, labels, feats lengths, label lengths)]
-        
+
             mel=mel,
             f0=f0_frames,
             volume=volume_frames,
@@ -268,25 +273,21 @@ def padding(data, configs):
     for sample in data:
         try:
             assert isinstance(sample, list)
-            ssl_feature_len = torch.tensor(
-                [x["mel_spec"].size(0) for x in sample], dtype=torch.int32
-            )  # 每个样本的mel长度
-            order = torch.argsort(ssl_feature_len, descending=False)  # 降序
             # dur = [sample[i]["dur"] for i in order]
-            keyshift = [sample[i]["keyshift"] for i in order]
-            
-            f0 = [torch.FloatTensor(sample[i]["f0"].astype(np.float32)) for i in order]
-            ssl = [sample[i]["ssl_feature"] for i in order]  # [768, t]
-            aug_mel_spec = [sample[i]["aug_mel_spec"] for i in order]  # [t, num_mels]
-            aug_volume = [sample[i]["aug_volume"] for i in order]
-            mel_spec = [sample[i]["mel_spec"] for i in order]
-            volume = [sample[i]["volume"] for i in order]
-            frame_num = mel_spec[0].shape[0]
+            keyshift = [i["keyshift"] for i in sample]
+
+            f0 = [torch.FloatTensor(i["f0"].astype(np.float32)) for i in sample]
+            ssl = [i["ssl_feature"] for i in sample]  # [768, t]
+            aug_mel_spec = [i["aug_mel_spec"] for i in sample]  # [t, num_mels]
+            aug_volume = [i["aug_volume"] for i in sample]
+            mel_spec = [i["mel_spec"] for i in sample]
+            volume = [i["volume"] for i in sample]
+            frame_num = int(2 / (512/44100))
             for i in range(0, len(sample)):
                 if random.uniform(0, 1) < 0.5:
                     aug_flag = True
                 else:
-                    aug_flag = False        
+                    aug_flag = False
                 cur_frame_num = mel_spec[i].shape[0]
                 if cur_frame_num == frame_num:  # 等长
                     if aug_flag:
@@ -298,35 +299,38 @@ def padding(data, configs):
                         keyshift[i] = 0
                     continue
                 # 随机筛选frame_num
-                start_idx = np.random.randint(0, cur_frame_num-frame_num) # 随机截取
-                
+                start_idx = np.random.randint(0, cur_frame_num - frame_num)  # 随机截取
+
                 if aug_flag:
-                    mel_spec[i] = aug_mel_spec[i][start_idx:start_idx+frame_num, :]
-                    volume[i] = aug_volume[i][start_idx:start_idx+frame_num]
-                    f0[i] = 2 ** (keyshift[i] / 12) * f0[i][start_idx : start_idx + frame_num]
+                    mel_spec[i] = aug_mel_spec[i][start_idx : start_idx + frame_num, :]
+                    volume[i] = aug_volume[i][start_idx : start_idx + frame_num]
+                    f0[i] = (
+                        2 ** (keyshift[i] / 12)
+                        * f0[i][start_idx : start_idx + frame_num]
+                    )
                 else:
-                    mel_spec[i] = mel_spec[i][start_idx:start_idx+frame_num, :]
-                    volume[i] = volume[i][start_idx:start_idx+frame_num]
-                    f0[i] = f0[i][start_idx:start_idx+frame_num]
+                    mel_spec[i] = mel_spec[i][start_idx : start_idx + frame_num, :]
+                    volume[i] = volume[i][start_idx : start_idx + frame_num]
+                    f0[i] = f0[i][start_idx : start_idx + frame_num]
                     keyshift[i] = 0
-                ssl[i] = ssl[i][:, start_idx:start_idx+frame_num]
-                
-            spk_id = [sample[i]["spk_id"] for i in order]
+                ssl[i] = ssl[i][:, start_idx : start_idx + frame_num]
+
+            spk_id = [i["spk_id"] for i in sample]
             spk_id = torch.tensor(spk_id, dtype=torch.int64)
-            
+
             keyshift = torch.tensor(keyshift, dtype=torch.float32)
             f0 = torch.stack(f0, dim=0)
             ssl = torch.stack(ssl, dim=0)
             volume = torch.stack(volume, dim=0)
             mel_spec = torch.stack(mel_spec, dim=0)
-            
+
             batch = {
                 "mel_spec": mel_spec,  # [b, t, nff]
-                "ssl_feature": ssl,
-                "f0": f0,
-                "volume": volume,
+                "ssl_feature": ssl.transpose(-1, -2),
+                "f0": f0.unsqueeze(-1),
+                "volume": volume.unsqueeze(-1),
                 "spk_id": spk_id.unsqueeze(1),
-                "keyshift": keyshift.unsqueeze(1).unsqueeze(1),
+                "keyshift": keyshift.unsqueeze(-1).unsqueeze(-1),
             }
             yield batch
         except Exception as ex:

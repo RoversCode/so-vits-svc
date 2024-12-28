@@ -1,4 +1,4 @@
-name=sunyanzi
+name=alto
 python preprocess/split_train_dev.py  \
  --data_dir ckpts/${name} \
  --speech_encoder vec768l12 \

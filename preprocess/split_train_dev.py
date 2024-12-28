@@ -95,7 +95,7 @@ if __name__ == "__main__":
             if file_path.name.startswith("."):
                 continue
             if get_wav_duration(file_path) < 0.3:
-                logger.info("Skip too short audio: " + file_path)
+                logger.info("Skip too short audio: " + str(file_path))
                 continue
             wavs.append(file_path)
         shuffle(wavs)

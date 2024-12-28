@@ -394,7 +394,7 @@ def load_filepaths_and_text(filename, split="|"):
 def get_hparams():
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_name',
-                        default="sunyanzi",
+                        default="gensin",
                         type=str,
                         help='本次实验名')
     parser.add_argument('--target_model',

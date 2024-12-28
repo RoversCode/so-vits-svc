@@ -1,29 +1,31 @@
-data:
+data: !!python/object:utils.HParams
+  batch_size: 48
+  batch_type: static
   block_size: 512
   cnhubertsoft_gate: 10
-  duration: 1.5
+  duration: 2
   encoder: vec768l12
   encoder_hop_size: 320
   encoder_out_channels: 768
   encoder_sample_rate: 16000
   extensions:
   - wav
+  hop_length: 512
+  max_frames_in_batch: 3000
   sampling_rate: 44100
   shuffle_size: 100
   sort_size: 50
-  hop_length: 512
-  max_frames_in_batch: 3000
-  batch_size: 48
-  batch_type: dynamic
-  training_files: filelists/train.txt
+  spk:
+    Alto: 0
+  training_files: ckpts/alto/train.list
   unit_interpolate_mode: nearest
-  validation_files: filelists/val.txt
-
+  validation_files: ckpts/alto/val.list
 infer:
   method: dpm-solver++
   speedup: 10
+
 model:
-  k_step_max: 0
+  k_step_max: 100
   n_chans: 512
   n_hidden: 256
   n_layers: 20
@@ -59,3 +61,4 @@ train:
 vocoder:
   ckpt: pretrain/nsf_hifigan/model
   type: nsf-hifigan
+

@@ -151,7 +151,7 @@ def run():
     #     last_epoch=epoch_str - 2,  # 如果epoch是从1开始计数
     # )
     scheduler = lr_scheduler.StepLR(
-        optimizer, step_size=1000000, gamma=hps.train.gamma, last_epoch=epoch_str - 2
+        optimizer, step_size=100000, gamma=hps.train.gamma, last_epoch=epoch_str - 2
     )
     scaler = GradScaler(enabled=hps.train.fp16_run)
     for epoch in range(epoch_str, hps.train.epochs):
@@ -230,31 +230,29 @@ def train_and_evaluate(
 
             if sovits_join(group_join, batch_idx):
                 break
-
-            mel_spec = items["mel_spec"].cuda(rank, non_blocking=False)
-            f0 = items["f0"].cuda(rank, non_blocking=False)  #  f0.unsqueeze(2)
-            volume = items["volume"].cuda(rank, non_blocking=False)  #  f0.unsqueeze(2)
-            ssl_feature = items["ssl_feature"].cuda(
-                rank, non_blocking=False
-            )  # ssl_feature.permute(0,2,1)
-            spk_id = items["spk_id"].cuda(rank, non_blocking=False)  # unsqueeze(1)
-            keyshift = items["keyshift"].cuda(rank, non_blocking=False)  # unsqueeze(1)
-            with autocast(enabled=hps.train.fp16_run):
-                loss = model(
-                    ssl_feature.permute(0, 2, 1),
-                    f0.unsqueeze(2),
-                    volume.unsqueeze(2),
-                    spk_id,
-                    aug_shift=keyshift,
-                    gt_spec=mel_spec,
-                    infer=False,
-                    k_step=(
-                        model.module.k_step_max
-                        if hasattr(model, "module")
-                        else model.k_step_max
-                    ),
-                )
             optimizer.zero_grad()
+            mel_spec = items["mel_spec"].cuda(rank)
+            f0 = items["f0"].cuda(rank)  #  f0.unsqueeze(2)
+            volume = items["volume"].cuda(rank)  #  f0.unsqueeze(2)
+            ssl_feature = items["ssl_feature"].cuda(
+                rank
+            )  # ssl_feature.permute(0,2,1)
+            spk_id = items["spk_id"].cuda(rank)  # unsqueeze(1)
+            keyshift = items["keyshift"].cuda(rank)  # unsqueeze(1)
+            loss = model(
+                ssl_feature.float(),
+                f0,
+                volume,
+                spk_id,
+                aug_shift=keyshift,
+                gt_spec=mel_spec.float(),
+                infer=False,
+                k_step=(
+                    model.module.k_step_max
+                    if hasattr(model, "module")
+                    else model.k_step_max
+                ),
+            )            
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -303,16 +301,16 @@ def evaluate(rank, hps, model, eval_loader, writer_eval):
     model.eval()
     with torch.no_grad():
         for batch_idx, items in enumerate(eval_loader):
-            mel_spec = items["mel_spec"].cuda(rank, non_blocking=False)
-            f0 = items["f0"].cuda(rank, non_blocking=False)
-            volume = items["volume"].cuda(rank, non_blocking=False)
-            ssl_feature = items["ssl_feature"].cuda(rank, non_blocking=False)
-            spk_id = items["spk_id"].cuda(rank, non_blocking=False)
+            mel_spec = items["mel_spec"].cuda(rank)
+            f0 = items["f0"].cuda(rank)
+            volume = items["volume"].cuda(rank)
+            ssl_feature = items["ssl_feature"].cuda(rank)
+            spk_id = items["spk_id"].cuda(rank)
             # keyshift = items["keyshift"].cuda(rank, non_blocking=False)
             gen_mel = model(
-                ssl_feature.permute(0, 2, 1),
-                f0.unsqueeze(2),
-                volume.unsqueeze(2),
+                ssl_feature,
+                f0,
+                volume,
                 spk_id,
                 gt_spec=mel_spec,
                 infer=True,

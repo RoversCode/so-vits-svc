@@ -39,11 +39,16 @@ class CrepeF0Predictor(F0Predictor):
             assert abs(p_len - x.shape[0] // self.hop_length) < 4, "pad length error"
         f0, uv = self.F0Creper(x[None, :].float(), self.sampling_rate, pad_to=p_len)
         return f0
-
-    def compute_f0_uv(self, wav, p_len=None):
-        x = torch.FloatTensor(wav).to(self.device)
+    def compute_f0_uv(self, wav, sr, p_len=None):
+        import numpy as np
+        if isinstance(wav, np.ndarray):
+            wav = torch.from_numpy(wav).float()
+        if wav.device != self.device:
+            wav = wav.to(self.device)
+        x = wav
         if p_len is None:
-            p_len = x.shape[0] // self.hop_length
+            dur = len(wav) / sr
+            p_len = int((dur * self.sampling_rate) // self.hop_length)
         else:
             assert abs(p_len - x.shape[0] // self.hop_length) < 4, "pad length error"
         f0, uv = self.F0Creper(x[None, :].float(), self.sampling_rate, pad_to=p_len)

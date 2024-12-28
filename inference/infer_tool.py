@@ -270,7 +270,7 @@ class Svc(object):
                 device=self.dev,
                 threshold=cr_threshold,
             )
-        f0, uv = self.f0_predictor_object.compute_f0_uv(wav)
+        f0, uv = self.f0_predictor_object.compute_f0_uv(wav, self.target_sample)
 
         if f0_filter and sum(f0) == 0:
             raise F0FilterException("No voice detected")

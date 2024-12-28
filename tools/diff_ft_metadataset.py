@@ -81,6 +81,7 @@ class DistributedSampler:
         data = data[self.worker_id :: self.num_workers]
         return data
 
+
 class DataList(IterableDataset):
 
     def __init__(self, lists, configs, shuffle=True, partition=True):
@@ -101,7 +102,7 @@ class DataList(IterableDataset):
                 sample["audio_data"] = f.read()
 
             # f0
-            sample["f0"], sample["uv"] = np.load(
+            sample["f0"], _ = np.load(
                 index.parent / ("_".join(index.stem.split("_")[:2]) + "_f0.npy"),
                 allow_pickle=True,
             )

@@ -147,9 +147,9 @@ def run():
         epoch_str = 1
         global_step = 0
 
-    if hps.train.skip_optimizer:
-        epoch_str = 1
-        global_step = 0
+    # if hps.train.skip_optimizer:
+    #     epoch_str = 1
+    #     global_step = 0
 
     warmup_epoch = hps.train.warmup_epochs
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(

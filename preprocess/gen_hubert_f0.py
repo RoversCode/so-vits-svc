@@ -52,7 +52,7 @@ def process_one(
     # logger.info(f"Process {filename} 编码器耗时 {ssl_time:.2f}s")
 
     if not os.path.exists(f0_path):  # 预测f0
-        f0, uv = f0_predictor.compute_f0_uv(wav16k.squeeze(0), 16000)
+        f0, uv = f0_predictor.compute_f0_uv(audio_norm.squeeze(), sampling_rate)
         np.save(f0_path, np.asanyarray((f0, uv), dtype=object))
     f0_time = time.time() - strat_time - ssl_time
     logger.info(f"Process {file_path.name} F0耗时 {f0_time:.2f}s")
@@ -145,6 +145,7 @@ def parallel_process(data_dir, num_processes, f0p, device):
                 start = int(i * len(filenames) / num_processes)
                 end = int((i + 1) * len(filenames) / num_processes)
                 file_chunk = filenames[start:end]
+                # process_batch(file_chunk, f0p, device)
                 tasks.append(
                     executor.submit(
                         process_batch,
@@ -165,8 +166,8 @@ speech_encoder = hps.model.speech_encoder
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default=None)
-    parser.add_argument("--data_dir", type=str, help="path to input dir")
+    parser.add_argument("--device", type=str, default='cuda')
+    parser.add_argument("--data_dir", type=str,default='ckpts/gensin/audio_slice', help="path to input dir")
     # parser.add_argument(
     #     "--use_diff", action="store_true", help="Whether to use the diffusion model"
     # )

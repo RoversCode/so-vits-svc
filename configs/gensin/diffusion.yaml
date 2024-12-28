@@ -1,7 +1,7 @@
-data:
+data: !!python/object:utils.HParams
   block_size: 512
   cnhubertsoft_gate: 10
-  duration: 1.5
+  duration: 2
   encoder: vec768l12
   encoder_hop_size: 320
   encoder_out_channels: 768
@@ -9,21 +9,23 @@ data:
   extensions:
   - wav
   sampling_rate: 44100
-  shuffle_size: 100
-  sort_size: 50
+  spk:
+    Hutao: 0
+  shuffle_size: 10
+  sort_size: 10
   hop_length: 512
-  max_frames_in_batch: 3000
   batch_size: 48
-  batch_type: dynamic
-  training_files: filelists/train.txt
+  max_frames_in_batch: 10000
+  batch_type: static  # static dynamic
+  training_files: ckpts/gensin/train.list
   unit_interpolate_mode: nearest
-  validation_files: filelists/val.txt
-
+  validation_files: ckpts/gensin/val.list
 infer:
   method: dpm-solver++
   speedup: 10
+
 model:
-  k_step_max: 0
+  k_step_max: 100
   n_chans: 512
   n_hidden: 256
   n_layers: 20

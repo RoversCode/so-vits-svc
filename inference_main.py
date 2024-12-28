@@ -28,14 +28,14 @@ def get_args():
         "-m",
         "--model_path",
         type=str,
-        default="ckpts/sunyanzi/sovits/G_7965.pth",
+        default="ckpts/gensin/sovits/G_7113.pth",
         help="模型路径",
     )
     parser.add_argument(
         "-c",
         "--config_path",
         type=str,
-        default="configs/sunyanzi/sovits.yaml",
+        default="configs/gensin/sovits.yaml",
         help="配置文件路径",
     )
     parser.add_argument(
@@ -50,7 +50,7 @@ def get_args():
         "--clean_names",
         type=str,
         nargs="+",
-        default=["notebook/sovits_svc/像我的我.wav"],
+        default=["notebook/sovits_svc/1_1_周深 - 家后 (Live版)_(Vocals)_(No Echo).wav"],
         help="wav文件名列表，放在raw文件夹下",
     )
     parser.add_argument(
@@ -66,7 +66,7 @@ def get_args():
         "--spk_list",
         type=str,
         nargs="+",
-        default=["sunyanzi"],
+        default=["Hutao"],
         help="合成目标说话人名称",
     )
 
@@ -103,7 +103,7 @@ def get_args():
         "-f0p",
         "--f0_predictor",
         type=str,
-        default="crepe",
+        default="rmvpe",
         help="选择F0预测器,可选择crepe,pm,dio,harvest,rmvpe,fcpe默认为pm(注意：crepe为原F0使用均值滤波器)",
     )
     parser.add_argument(
@@ -131,7 +131,7 @@ def get_args():
         "-lea",
         "--loudness_envelope_adjustment",
         type=float,
-        default=1,
+        default=0.75,
         help="输入源响度包络替换输出响度包络融合比例，越靠近1越使用输出响度包络",
     )
     parser.add_argument(
@@ -147,14 +147,14 @@ def get_args():
         "-dm",
         "--diffusion_model_path",
         type=str,
-        default="ckpts/sunyanzi/diffusion/diff_2001.pt",
+        default="ckpts/gensin/diffusion/shallow_diff_2000.pt",
         help="扩散模型路径",
     )
     parser.add_argument(
         "-dc",
         "--diffusion_config_path",
         type=str,
-        default="configs/sunyanzi/diffusion.yaml",
+        default="configs/gensin/diffusion.yaml",
         help="扩散模型配置文件路径",
     )
     parser.add_argument(
