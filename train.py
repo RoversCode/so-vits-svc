@@ -26,7 +26,6 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.tensorboard import SummaryWriter
-
 # from data_utils import TextAudioCollate, TextAudioSpeakerLoader
 from models import (
     MultiPeriodDiscriminator,

@@ -40,6 +40,7 @@ train:
   log_interval: 10
   per_epoch_save: 20
   epochs: 100000
+  decay_step: 100000
   num_workers: 5
   prefetch: 5
   pin_memory: true

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
+"""
 @File    :   utils.py
 @Time    :   2024/11/13 21:09:53
 @Author  :   ChengHee
 @Version :   1.0
 @Contact :   liujunjie199810@gmail.com
 @Desc    :   None
-'''
+"""
 
 # here put the import lib
 import argparse
@@ -63,9 +63,10 @@ def plot_data_to_numpy(x, y):
     global MATPLOTLIB_FLAG
     if not MATPLOTLIB_FLAG:
         import matplotlib
+
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
-        mpl_logger = logging.getLogger('matplotlib')
+        mpl_logger = logging.getLogger("matplotlib")
         mpl_logger.setLevel(logging.WARNING)
     import matplotlib.pylab as plt
     import numpy as np
@@ -76,8 +77,8 @@ def plot_data_to_numpy(x, y):
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3, ))
+    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
 
@@ -85,7 +86,7 @@ def plot_data_to_numpy(x, y):
 def f0_to_coarse(f0):
     f0_mel = 1127 * (1 + f0 / 700).log()
     a = (f0_bin - 2) / (f0_mel_max - f0_mel_min)
-    b = f0_mel_min * a - 1.
+    b = f0_mel_min * a - 1.0
     f0_mel = torch.where(f0_mel > 0, f0_mel * a - b, f0_mel)
     # torch.clip_(f0_mel, min=1., max=float(f0_bin - 1))
     f0_coarse = torch.round(f0_mel).long()
@@ -106,36 +107,51 @@ def get_content(cmodel, y):
 def get_f0_predictor(f0_predictor, hop_length, sampling_rate, **kargs):
     if f0_predictor == "pm":
         from modules.F0Predictor.PMF0Predictor import PMF0Predictor
-        f0_predictor_object = PMF0Predictor(hop_length=hop_length,
-                                            sampling_rate=sampling_rate)
+
+        f0_predictor_object = PMF0Predictor(
+            hop_length=hop_length, sampling_rate=sampling_rate
+        )
     elif f0_predictor == "crepe":
         from modules.F0Predictor.CrepeF0Predictor import CrepeF0Predictor
-        f0_predictor_object = CrepeF0Predictor(hop_length=hop_length,
-                                               sampling_rate=sampling_rate,
-                                               device=kargs["device"],
-                                               threshold=kargs["threshold"])
+
+        f0_predictor_object = CrepeF0Predictor(
+            hop_length=hop_length,
+            sampling_rate=sampling_rate,
+            device=kargs["device"],
+            threshold=kargs["threshold"],
+        )
     elif f0_predictor == "harvest":
         from modules.F0Predictor.HarvestF0Predictor import HarvestF0Predictor
-        f0_predictor_object = HarvestF0Predictor(hop_length=hop_length,
-                                                 sampling_rate=sampling_rate)
+
+        f0_predictor_object = HarvestF0Predictor(
+            hop_length=hop_length, sampling_rate=sampling_rate
+        )
     elif f0_predictor == "dio":
         from modules.F0Predictor.DioF0Predictor import DioF0Predictor
-        f0_predictor_object = DioF0Predictor(hop_length=hop_length,
-                                             sampling_rate=sampling_rate)
+
+        f0_predictor_object = DioF0Predictor(
+            hop_length=hop_length, sampling_rate=sampling_rate
+        )
     elif f0_predictor == "rmvpe":
         from modules.F0Predictor.RMVPEF0Predictor import RMVPEF0Predictor
-        f0_predictor_object = RMVPEF0Predictor(hop_length=hop_length,
-                                               sampling_rate=sampling_rate,
-                                               dtype=torch.float32,
-                                               device=kargs["device"],
-                                               threshold=kargs["threshold"])
+
+        f0_predictor_object = RMVPEF0Predictor(
+            hop_length=hop_length,
+            sampling_rate=sampling_rate,
+            dtype=torch.float32,
+            device=kargs["device"],
+            threshold=kargs["threshold"],
+        )
     elif f0_predictor == "fcpe":
         from modules.F0Predictor.FCPEF0Predictor import FCPEF0Predictor
-        f0_predictor_object = FCPEF0Predictor(hop_length=hop_length,
-                                              sampling_rate=sampling_rate,
-                                              dtype=torch.float32,
-                                              device=kargs["device"],
-                                              threshold=kargs["threshold"])
+
+        f0_predictor_object = FCPEF0Predictor(
+            hop_length=hop_length,
+            sampling_rate=sampling_rate,
+            dtype=torch.float32,
+            device=kargs["device"],
+            threshold=kargs["threshold"],
+        )
     else:
         raise Exception("Unknown f0 predictor")
     return f0_predictor_object
@@ -144,65 +160,79 @@ def get_f0_predictor(f0_predictor, hop_length, sampling_rate, **kargs):
 def get_speech_encoder(speech_encoder, device=None, **kargs):
     if speech_encoder == "vec768l12":
         from vencoder.ContentVec768L12 import ContentVec768L12
+
         speech_encoder_object = ContentVec768L12(device=device)
     elif speech_encoder == "vec256l9":
         from vencoder.ContentVec256L9 import ContentVec256L9
+
         speech_encoder_object = ContentVec256L9(device=device)
     elif speech_encoder == "vec256l9-onnx":
         from vencoder.ContentVec256L9_Onnx import ContentVec256L9_Onnx
+
         speech_encoder_object = ContentVec256L9_Onnx(device=device)
     elif speech_encoder == "vec256l12-onnx":
         from vencoder.ContentVec256L12_Onnx import ContentVec256L12_Onnx
+
         speech_encoder_object = ContentVec256L12_Onnx(device=device)
     elif speech_encoder == "vec768l9-onnx":
         from vencoder.ContentVec768L9_Onnx import ContentVec768L9_Onnx
+
         speech_encoder_object = ContentVec768L9_Onnx(device=device)
     elif speech_encoder == "vec768l12-onnx":
         from vencoder.ContentVec768L12_Onnx import ContentVec768L12_Onnx
+
         speech_encoder_object = ContentVec768L12_Onnx(device=device)
     elif speech_encoder == "hubertsoft-onnx":
         from vencoder.HubertSoft_Onnx import HubertSoft_Onnx
+
         speech_encoder_object = HubertSoft_Onnx(device=device)
     elif speech_encoder == "hubertsoft":
         from vencoder.HubertSoft import HubertSoft
+
         speech_encoder_object = HubertSoft(device=device)
     elif speech_encoder == "whisper-ppg":
         from vencoder.WhisperPPG import WhisperPPG
+
         speech_encoder_object = WhisperPPG(device=device)
     elif speech_encoder == "cnhubertlarge":
         from vencoder.CNHubertLarge import CNHubertLarge
+
         speech_encoder_object = CNHubertLarge(device=device)
     elif speech_encoder == "dphubert":
         from vencoder.DPHubert import DPHubert
+
         speech_encoder_object = DPHubert(device=device)
     elif speech_encoder == "whisper-ppg-large":
         from vencoder.WhisperPPGLarge import WhisperPPGLarge
+
         speech_encoder_object = WhisperPPGLarge(device=device)
     elif speech_encoder == "wavlmbase+":
         from vencoder.WavLMBasePlus import WavLMBasePlus
+
         speech_encoder_object = WavLMBasePlus(device=device)
     else:
         raise Exception("Unknown speech encoder")
     return speech_encoder_object
 
 
-def load_checkpoint(checkpoint_path,
-                    model,
-                    optimizer=None,
-                    skip_optimizer=False):
+def load_checkpoint(checkpoint_path, model, optimizer=None, skip_optimizer=False):
     assert os.path.isfile(checkpoint_path)
-    checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    if 'iteration' in checkpoint_dict:
-        iteration = checkpoint_dict['iteration'] 
+    checkpoint_dict = torch.load(checkpoint_path, map_location="cpu")
+    if (
+        optimizer is not None
+        and not skip_optimizer
+        and checkpoint_dict["optimizer"] is not None
+    ):
+        optimizer.load_state_dict(checkpoint_dict["optimizer"])
+        iteration = checkpoint_dict["iteration"]
+        global_step = checkpoint_dict["global_step"]
     else:
+        global_step = 0
         iteration = 1
-    if optimizer is not None and not skip_optimizer and checkpoint_dict[
-            'optimizer'] is not None:
-        optimizer.load_state_dict(checkpoint_dict['optimizer'])
-        
-    saved_state_dict = checkpoint_dict['model']
+
+    saved_state_dict = checkpoint_dict["model"]
     model = model.to(list(saved_state_dict.values())[0].dtype)
-    if hasattr(model, 'module'):
+    if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
@@ -213,55 +243,61 @@ def load_checkpoint(checkpoint_path,
             # print("load", k)
             new_state_dict[k] = saved_state_dict[k]
             assert saved_state_dict[k].shape == v.shape, (
-                saved_state_dict[k].shape, v.shape)
+                saved_state_dict[k].shape,
+                v.shape,
+            )
         except Exception:
             if "enc_q" not in k or "emb_g" not in k:
                 print(
                     "%s is not in the checkpoint,please check your checkpoint.If you're using pretrain model,just ignore this warning."
-                    % k)
+                    % k
+                )
                 logger.info("%s is not in the checkpoint" % k)
                 new_state_dict[k] = v
             iteration = 1
-    if hasattr(model, 'module'):
+    if hasattr(model, "module"):
         model.module.load_state_dict(new_state_dict)
     else:
         model.load_state_dict(new_state_dict)
     print("load ")
-    logger.info("Loaded checkpoint '{}' (iteration {})".format(
-        checkpoint_path, iteration))
-    return model, optimizer, iteration,
+    logger.info(
+        "Loaded checkpoint '{}' (iteration {})".format(checkpoint_path, iteration)
+    )
+    return model, optimizer, iteration, global_step
 
 
-def save_checkpoint(model, optimizer, learning_rate, iteration,
-                    checkpoint_path):
+def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
     logger.info(
         "Saving model and optimizer state at iteration {} to {}".format(
-            iteration, checkpoint_path))
-    if hasattr(model, 'module'):
+            iteration, checkpoint_path
+        )
+    )
+    if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
     torch.save(
         {
-            'model': state_dict,
-            'iteration': iteration,
-            'optimizer': optimizer.state_dict()
-        }, checkpoint_path)
+            "model": state_dict,
+            "iteration": iteration,
+            "optimizer": optimizer.state_dict(),
+        },
+        checkpoint_path,
+    )
 
 
-def clean_checkpoints(path_to_models='logs/44k/',
-                      n_ckpts_to_keep=2,
-                      sort_by_time=True):
+def clean_checkpoints(path_to_models="logs/44k/", n_ckpts_to_keep=2, sort_by_time=True):
     """Freeing up space by deleting saved ckpts
 
-  Arguments:
-  path_to_models    --  Path to the model directory
-  n_ckpts_to_keep   --  Number of ckpts to keep, excluding G_0.pth and D_0.pth
-  sort_by_time      --  True -> chronologically delete ckpts
-                        False -> lexicographically delete ckpts
-  """
+    Arguments:
+    path_to_models    --  Path to the model directory
+    n_ckpts_to_keep   --  Number of ckpts to keep, excluding G_0.pth and D_0.pth
+    sort_by_time      --  True -> chronologically delete ckpts
+                          False -> lexicographically delete ckpts
+    """
     ckpts_files = [
-        f for f in os.listdir(path_to_models)
+        f
+        for f in os.listdir(path_to_models)
         if os.path.isfile(os.path.join(path_to_models, f))
     ]
 
@@ -274,16 +310,14 @@ def clean_checkpoints(path_to_models='logs/44k/',
     sort_key = time_key if sort_by_time else name_key
 
     def x_sorted(_x):
-        return sorted([
-            f for f in ckpts_files
-            if f.startswith(_x) and not f.endswith("_0.pth")
-        ],
-                      key=sort_key)
+        return sorted(
+            [f for f in ckpts_files if f.startswith(_x) and not f.endswith("_0.pth")],
+            key=sort_key,
+        )
 
     to_del = [
         os.path.join(path_to_models, fn)
-        for fn in (x_sorted('G')[:-n_ckpts_to_keep] +
-                   x_sorted('D')[:-n_ckpts_to_keep])
+        for fn in (x_sorted("G")[:-n_ckpts_to_keep] + x_sorted("D")[:-n_ckpts_to_keep])
     ]
 
     def del_info(fn):
@@ -295,19 +329,21 @@ def clean_checkpoints(path_to_models='logs/44k/',
     [del_routine(fn) for fn in to_del]
 
 
-def summarize(writer,
-              global_step,
-              scalars={},
-              histograms={},
-              images={},
-              audios={},
-              audio_sampling_rate=22050):
+def summarize(
+    writer,
+    global_step,
+    scalars={},
+    histograms={},
+    images={},
+    audios={},
+    audio_sampling_rate=22050,
+):
     for k, v in scalars.items():
         writer.add_scalar(k, v, global_step)
     for k, v in histograms.items():
         writer.add_histogram(k, v, global_step)
     for k, v in images.items():
-        writer.add_image(k, v, global_step, dataformats='HWC')
+        writer.add_image(k, v, global_step, dataformats="HWC")
     for k, v in audios.items():
         writer.add_audio(k, v, global_step, audio_sampling_rate)
 
@@ -315,7 +351,8 @@ def summarize(writer,
 def latest_checkpoint_path(dir_path, regex="G_*.pt"):
     f_list = list(dir_path.glob(regex))
     f_list.sort(
-        key=lambda f: int("".join(filter(str.isdigit, str(f)))))  # 根据提取的数据，排列
+        key=lambda f: int("".join(filter(str.isdigit, str(f))))
+    )  # 根据提取的数据，排列
     x = f_list[-1]  # 取最新的ckpt
     print(x)
     return x
@@ -325,26 +362,24 @@ def plot_spectrogram_to_numpy(spectrogram):
     global MATPLOTLIB_FLAG
     if not MATPLOTLIB_FLAG:
         import matplotlib
+
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
-        mpl_logger = logging.getLogger('matplotlib')
+        mpl_logger = logging.getLogger("matplotlib")
         mpl_logger.setLevel(logging.WARNING)
     import matplotlib.pylab as plt
     import numpy as np
 
     fig, ax = plt.subplots(figsize=(10, 2))
-    im = ax.imshow(spectrogram,
-                   aspect="auto",
-                   origin="lower",
-                   interpolation='none')
+    im = ax.imshow(spectrogram, aspect="auto", origin="lower", interpolation="none")
     plt.colorbar(im, ax=ax)
     plt.xlabel("Frames")
     plt.ylabel("Channels")
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3, ))
+    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
 
@@ -353,29 +388,29 @@ def plot_alignment_to_numpy(alignment, info=None):
     global MATPLOTLIB_FLAG
     if not MATPLOTLIB_FLAG:
         import matplotlib
+
         matplotlib.use("Agg")
         MATPLOTLIB_FLAG = True
-        mpl_logger = logging.getLogger('matplotlib')
+        mpl_logger = logging.getLogger("matplotlib")
         mpl_logger.setLevel(logging.WARNING)
     import matplotlib.pylab as plt
     import numpy as np
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    im = ax.imshow(alignment.transpose(),
-                   aspect='auto',
-                   origin='lower',
-                   interpolation='none')
+    im = ax.imshow(
+        alignment.transpose(), aspect="auto", origin="lower", interpolation="none"
+    )
     fig.colorbar(im, ax=ax)
-    xlabel = 'Decoder timestep'
+    xlabel = "Decoder timestep"
     if info is not None:
-        xlabel += '\n\n' + info
+        xlabel += "\n\n" + info
     plt.xlabel(xlabel)
-    plt.ylabel('Encoder timestep')
+    plt.ylabel("Encoder timestep")
     plt.tight_layout()
 
     fig.canvas.draw()
-    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
-    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3, ))
+    data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
 
@@ -386,36 +421,36 @@ def load_wav_to_torch(full_path):
 
 
 def load_filepaths_and_text(filename, split="|"):
-    with open(filename, encoding='utf-8') as f:
+    with open(filename, encoding="utf-8") as f:
         filepaths_and_text = [line.strip().split(split) for line in f]
     return filepaths_and_text
 
 
 def get_hparams():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp_name',
-                        default="gensin",
-                        type=str,
-                        help='本次实验名')
-    parser.add_argument('--target_model',
-                        default="diffusion",  # diffusion sovits
-                        type=str,
-                        help='本次实验名')
+    parser.add_argument("--exp_name", default="gensin", type=str, help="本次实验名")
+    parser.add_argument(
+        "--target_model",
+        default="diffusion",  # diffusion sovits
+        type=str,
+        help="本次实验名",
+    )
 
     args = parser.parse_args()
     config_path = Path(f"configs/{args.exp_name}/{args.target_model}.yaml")
     # 创建exp_name文件夹
     config_path.parent.mkdir(parents=True, exist_ok=True)
     if config_path.exists():
-        print('加载自定配置：', str(config_path))
+        print("加载自定配置：", str(config_path))
         # 加载基础配置
         config = yaml.unsafe_load(open(str(config_path)))
     else:
-        print('加载基础配置：', 'configs/sovits_base_config.yaml')
+        print("加载基础配置：", "configs/sovits_base_config.yaml")
         config = yaml.unsafe_load(open(f"configs/{args.target_model}_base_config.yaml"))
-        
+
     model_dir = Path(f"ckpts/{args.exp_name}/{args.target_model}")
     model_dir.mkdir(parents=True, exist_ok=True)
+    config["args"] = vars(args)
     hparams = HParams(**config)
     hparams.model_dir = model_dir
     return hparams
@@ -442,8 +477,10 @@ def check_git_hash(model_dir):
     source_dir = os.path.dirname(os.path.realpath(__file__))
     if not os.path.exists(os.path.join(source_dir, ".git")):
         logger.warn(
-            "{} is not a git repository, therefore hash value comparison will be ignored."
-            .format(source_dir))
+            "{} is not a git repository, therefore hash value comparison will be ignored.".format(
+                source_dir
+            )
+        )
         return
 
     cur_hash = subprocess.getoutput("git rev-parse HEAD")
@@ -453,8 +490,10 @@ def check_git_hash(model_dir):
         saved_hash = open(path).read()
         if saved_hash != cur_hash:
             logger.warn(
-                "git hash values are different. {}(saved) != {}(current)".
-                format(saved_hash[:8], cur_hash[:8]))
+                "git hash values are different. {}(saved) != {}(current)".format(
+                    saved_hash[:8], cur_hash[:8]
+                )
+            )
     else:
         open(path, "w").write(cur_hash)
 
@@ -464,29 +503,31 @@ def get_logger(model_dir, filename="train.log"):
     logger = logging.getLogger(model_dir.parent.name)
     logger.setLevel(logging.DEBUG)
 
-    formatter = logging.Formatter(
-        "%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
+    formatter = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
     model_dir.mkdir(parents=True, exist_ok=True)
-    h = logging.FileHandler(model_dir/filename)
+    h = logging.FileHandler(model_dir / filename)
     h.setLevel(logging.DEBUG)
     h.setFormatter(formatter)
     logger.addHandler(h)
     return logger
 
 
-def repeat_expand_2d(content, target_len, mode='left'):
+def repeat_expand_2d(content, target_len, mode="left"):
     # content : [h, t]
-    return repeat_expand_2d_left(
-        content, target_len) if mode == 'left' else repeat_expand_2d_other(
-            content, target_len, mode)
+    return (
+        repeat_expand_2d_left(content, target_len)
+        if mode == "left"
+        else repeat_expand_2d_other(content, target_len, mode)
+    )
 
 
 def repeat_expand_2d_left(content, target_len):
     # content : [h, t]
 
     src_len = content.shape[-1]
-    target = torch.zeros([content.shape[0], target_len],
-                         dtype=torch.float).to(content.device)
+    target = torch.zeros([content.shape[0], target_len], dtype=torch.float).to(
+        content.device
+    )
     temp = torch.arange(src_len + 1) * target_len / src_len
     current_pos = 0
     for i in range(target_len):
@@ -500,10 +541,12 @@ def repeat_expand_2d_left(content, target_len):
 
 
 # mode : 'nearest'| 'linear'| 'bilinear'| 'bicubic'| 'trilinear'| 'area'
-def repeat_expand_2d_other(content, target_len, mode='nearest'):
+def repeat_expand_2d_other(content, target_len, mode="nearest"):
     # content : [h, t]
-    content = content[None, :, :] # # 1. 增加一个维度，变成 [1, 768, 761]
-    target = F.interpolate(content, size=target_len, mode=mode)[0] # 2. 插值，变成 [1, 768, target_len]
+    content = content[None, :, :]  # # 1. 增加一个维度，变成 [1, 768, 761]
+    target = F.interpolate(content, size=target_len, mode=mode)[
+        0
+    ]  # 2. 插值，变成 [1, 768, target_len]
     return target
 
 
@@ -521,38 +564,40 @@ def mix_model(model_paths, mix_rate, mode):
     return os.path.join(os.path.curdir, "output.pth")
 
 
-def change_rms(data1, sr1, data2, sr2,
-               rate):  # 1是输入音频，2是输出音频,rate是2的占比 from RVC
+def change_rms(
+    data1, sr1, data2, sr2, rate
+):  # 1是输入音频，2是输出音频,rate是2的占比 from RVC
     # print(data1.max(),data2.max())
-    rms1 = librosa.feature.rms(y=data1,
-                               frame_length=sr1 // 2 * 2,
-                               hop_length=sr1 // 2)  # 每半秒一个点
-    rms2 = librosa.feature.rms(y=data2.detach().cpu().numpy(),
-                               frame_length=sr2 // 2 * 2,
-                               hop_length=sr2 // 2)
+    rms1 = librosa.feature.rms(
+        y=data1, frame_length=sr1 // 2 * 2, hop_length=sr1 // 2
+    )  # 每半秒一个点
+    rms2 = librosa.feature.rms(
+        y=data2.detach().cpu().numpy(), frame_length=sr2 // 2 * 2, hop_length=sr2 // 2
+    )
     rms1 = torch.from_numpy(rms1).to(data2.device)
-    rms1 = F.interpolate(rms1.unsqueeze(0), size=data2.shape[0],
-                         mode="linear").squeeze()
+    rms1 = F.interpolate(
+        rms1.unsqueeze(0), size=data2.shape[0], mode="linear"
+    ).squeeze()
     rms2 = torch.from_numpy(rms2).to(data2.device)
-    rms2 = F.interpolate(rms2.unsqueeze(0), size=data2.shape[0],
-                         mode="linear").squeeze()
+    rms2 = F.interpolate(
+        rms2.unsqueeze(0), size=data2.shape[0], mode="linear"
+    ).squeeze()
     rms2 = torch.max(rms2, torch.zeros_like(rms2) + 1e-6)
-    data2 *= (torch.pow(rms1, torch.tensor(1 - rate)) *
-              torch.pow(rms2, torch.tensor(rate - 1)))
+    data2 *= torch.pow(rms1, torch.tensor(1 - rate)) * torch.pow(
+        rms2, torch.tensor(rate - 1)
+    )
     return data2
 
 
 def train_index(
-    spk_name,
-    root_dir="dataset/44k/"
-):  #from: RVC https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
+    spk_name, root_dir,
+):  # from: RVC https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
     n_cpu = cpu_count()
     print("The feature index is constructing.")
-    exp_dir = os.path.join(root_dir, spk_name)
+    exp_dir = root_dir/spk_name
     listdir_res = []
-    for file in os.listdir(exp_dir):
-        if ".wav.soft.pt" in file:
-            listdir_res.append(os.path.join(exp_dir, file))
+    for file in exp_dir.glob("*_ssl.pt"):
+        listdir_res.append(file)
     if len(listdir_res) == 0:
         raise Exception("You need to run preprocess_hubert_f0.py!")
     npys = []
@@ -568,13 +613,17 @@ def train_index(
         info = "Trying doing kmeans %s shape to 10k centers." % big_npy.shape[0]
         print(info)
         try:
-            big_npy = (MiniBatchKMeans(
-                n_clusters=10000,
-                verbose=True,
-                batch_size=256 * n_cpu,
-                compute_labels=False,
-                init="random",
-            ).fit(big_npy).cluster_centers_)
+            big_npy = (
+                MiniBatchKMeans(
+                    n_clusters=10000,
+                    verbose=True,
+                    batch_size=256 * n_cpu,
+                    compute_labels=False,
+                    init="random",
+                )
+                .fit(big_npy)
+                .cluster_centers_
+            )
         except Exception:
             info = traceback.format_exc()
             print(info)
@@ -585,12 +634,12 @@ def train_index(
     index.train(big_npy)
     batch_size_add = 8192
     for i in range(0, big_npy.shape[0], batch_size_add):
-        index.add(big_npy[i:i + batch_size_add])
+        index.add(big_npy[i : i + batch_size_add])
     # faiss.write_index(
     #     index,
     #     f"added_{spk_name}.index"
     # )
-    print("Successfully build index")
+    # print("Successfully build index")
     return index
 
 
@@ -600,7 +649,7 @@ def save_config(path_config, config):
         yaml.dump(config, f)
 
 
-class HParams():
+class HParams:
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -659,10 +708,12 @@ class Volume_Extractor:
         n_frames = int(audio.size(-1) // self.hop_size)
         audio2 = audio**2
         audio2 = torch.nn.functional.pad(
-            audio2, (int(self.hop_size // 2), int((self.hop_size + 1) // 2)),
-            mode='reflect')
+            audio2,
+            (int(self.hop_size // 2), int((self.hop_size + 1) // 2)),
+            mode="reflect",
+        )
         volume = torch.nn.functional.unfold(
-            audio2[:, None, None, :], (1, self.hop_size),
-            stride=self.hop_size)[:, :, :n_frames].mean(dim=1)[0]
+            audio2[:, None, None, :], (1, self.hop_size), stride=self.hop_size
+        )[:, :, :n_frames].mean(dim=1)[0]
         volume = torch.sqrt(volume)
         return volume

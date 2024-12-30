@@ -28,7 +28,7 @@ def get_args():
         "-m",
         "--model_path",
         type=str,
-        default="ckpts/gensin/sovits/G_7113.pth",
+        default="ckpts/gensin/sovits/12w/G_7113.pth",
         help="模型路径",
     )
     parser.add_argument(
@@ -82,14 +82,14 @@ def get_args():
         "-cm",
         "--cluster_model_path",
         type=str,
-        default="",
+        default="ckpts/gensin/index/feature_and_index.pkl",
         help="聚类模型或特征检索索引路径，留空则自动设为各方案模型的默认路径，如果没有训练聚类或特征检索则随便填",
     )
     parser.add_argument(
         "-cr",
         "--cluster_infer_ratio",
         type=float,
-        default=0,
+        default=0.85,
         help="聚类方案或特征检索占比，范围0-1，若没有训练聚类模型或特征检索则默认0即可",
     )
     parser.add_argument(
@@ -138,7 +138,7 @@ def get_args():
         "-fr",
         "--feature_retrieval",
         action="store_true",
-        default=False,
+        default=True,
         help="是否使用特征检索，如果使用聚类模型将被禁用，且cm与cr参数将会变成特征检索的索引路径与混合比例",
     )
 
@@ -147,7 +147,7 @@ def get_args():
         "-dm",
         "--diffusion_model_path",
         type=str,
-        default="ckpts/gensin/diffusion/shallow_diff_2000.pt",
+        default="ckpts/gensin/diffusion/diff_1500.pt",
         help="扩散模型路径",
     )
     parser.add_argument(

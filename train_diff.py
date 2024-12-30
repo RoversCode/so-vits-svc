@@ -113,17 +113,20 @@ def run():
         )
 
     # load parameters
-    optimizer = torch.optim.AdamW(model.parameters())
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=hps.train.lr,
+        betas=(0.9, 0.98)
+    )
 
     try:
         model_path = latest_checkpoint_path(hps.model_dir, "diff_*.pt")
-        _, _, epoch_str = load_checkpoint(
+        _, _, epoch_str, global_step = load_checkpoint(
             model_path,
             model,
             optimizer,
             hps.train.skip_optimizer,
         )
-        global_step = int(model_path.stem.split("_")[1]) + 1
     except:
         print("load old checkpoint failed...")
         epoch_str = 1
@@ -144,7 +147,12 @@ def run():
         print(f"要训练参数: {total_params}")
 
     model = DDP(model, device_ids=[rank])
-
+    # for param_group in optimizer.param_groups:
+    #     param_group["initial_lr"] = hps.train.lr
+    #     param_group["lr"] = hps.train.lr * (
+    #         hps.train.gamma ** max(((global_step - 2) // hps.train.decay_step), 0)
+    #     )
+    #     param_group["weight_decayweight_decay"] = hps.train.weight_decay
     # scheduler = lr_scheduler.ExponentialLR(
     #     optimizer,
     #     gamma=hps.train.gamma,
@@ -234,9 +242,7 @@ def train_and_evaluate(
             mel_spec = items["mel_spec"].cuda(rank)
             f0 = items["f0"].cuda(rank)  #  f0.unsqueeze(2)
             volume = items["volume"].cuda(rank)  #  f0.unsqueeze(2)
-            ssl_feature = items["ssl_feature"].cuda(
-                rank
-            )  # ssl_feature.permute(0,2,1)
+            ssl_feature = items["ssl_feature"].cuda(rank)  # ssl_feature.permute(0,2,1)
             spk_id = items["spk_id"].cuda(rank)  # unsqueeze(1)
             keyshift = items["keyshift"].cuda(rank)  # unsqueeze(1)
             loss = model(
@@ -252,7 +258,7 @@ def train_and_evaluate(
                     if hasattr(model, "module")
                     else model.k_step_max
                 ),
-            )            
+            )
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -290,6 +296,7 @@ def train_and_evaluate(
             {
                 "model": state_dict,
                 "iteration": epoch,
+                "global_step": global_step,
                 "optimizer": optimizer.state_dict(),
             },
             checkpoint_path,

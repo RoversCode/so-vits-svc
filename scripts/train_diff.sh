@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=0
-exp_name="sunyanzi"
+exp_name="gensin"
 target_model="diffusion"
 torchrun \
     --nproc_per_node=1 \
