@@ -162,7 +162,7 @@ def get_args():
         "--k_step",
         type=int,
         default=100,
-        help="扩散步数，越大越接近扩散模型的结果，默认100",
+        help="扩散步数，越大越接近扩散模型的结果，默认100", 
     )
     parser.add_argument(
         "-se",
