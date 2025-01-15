@@ -7,6 +7,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.cursorignore
 
 # C extensions
 *.so
@@ -165,3 +166,14 @@ pretrain/
 .vscode/launch.json
 
 trained/**/
+backup
+modeldata
+notebook
+eres2net
+raw
+pretrain
+dataset_raw
+raw_data
+ckpts
+Data
+raw_audios

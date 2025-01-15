@@ -1,0 +1,76 @@
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi"
+
+
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi" -shd -dm "logs/44k/diffusion/model_2000.pt"
+
+
+切片
+重采样
+mel
+spec
+ssl feature
+f0, uv
+
+
+------
+1. 歌声数据处理
+  gt singer done
+  pop 
+
+
+
+find /datadisk/liujunjie/so-vits-svc/ckpts/sunyanzi/audio_slice/sunyanzi -type f ! -name "*.wav" -delete
+
+
+
+
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi"
+
+
+python inference_main.py -m "logs/44k/G_5600.pth" -c "configs/config.json" -n "像我的我.wav" -t 0 -s "sunyanzi" -shd -dm "logs/44k/diffusion/model_2000.pt"
+
+
+切片
+重采样
+mel
+spec
+ssl feature
+f0, uv
+
+
+------
+1. 歌声数据处理
+  gt singer done
+  pop 
+
+
+
+find /datadisk/liujunjie/so-vits-svc/ckpts/sunyanzi/audio_slice/sunyanzi -type f ! -name "*.wav" -delete
+
+
+
+MDX-Net | Kim_Vocal_1: 分离人声及伴奏
+VR Architecture | 5_HP-Karaoke-UVR: 分离和声
+VR Architecture | UVR-DeEcho-DeReverb: 去除混响和回声
+
+除了传统的 UVR5 工作流，你还可以试试来自字节跳动火山引擎的 SAMI 技术分离人声。在人声伴奏分离方面 SAMI 可能有比 UVR5 更好的效果；且可以通过 WebUI 请求远程服务器，无需本地硬件推理。
+
+
+去和声：VR模型：5_HP-Karokee-UVR 
+提取和声：VR模型：6_HP-Karokee-UVR 
+去混响: UVR-DeEcho-DeReverb和UVR-DeNoice
+提取人声与伴奏: MDX23CInstVoc HQ
+
+抠人声【不推荐任何付费以及第三方的模型，UVR的BSRoformer效果就是最好的】：
+MDX-Net：BS-Roformer-Viperx-1296选Vocals Only（音源分离领域最强模型，没有之一） 作者：bfloat16 https://www.bilibili.com/read/cv27499700/ 出处：bilibili
+
+去混响【3选1，根据混响的程度选择，没有混响直接跳过】：
+VR Architecture：UVR-De-Echo-Normal选No Echo Only（轻度混响）
+VR Architecture：UVR-De-Echo-Aggressive选No Echo Only（重度混响）
+VR Architecture：UVR-De-Echo-Dereverb选No Reverb Only（遇到鸟之诗这种变态的混响可以用）
+
+去和声【4选1，优先尝试前3个，没有和声直接跳过】：
+VR Architecture：UVR-BVE-4B_SN-44100-1选Instrumental Only
+VR Architecture：5_HP_Karaoke-UVR选Vocals Only （比6激进，有可能会扣过头）
+VR Architecture：6_HP_Karaoke-UVR选Vocals Only（没有5激进
+

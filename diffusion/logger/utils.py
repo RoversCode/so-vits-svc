@@ -68,7 +68,7 @@ def get_network_paras_amount(model_dict):
 
 def load_config(path_config):
     with open(path_config, "r") as config:
-        args = yaml.safe_load(config)
+        args = yaml.unsafe_load(config)
     args = DotDict(args)
     # print(args)
     return args
