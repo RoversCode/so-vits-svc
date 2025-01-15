@@ -1,8 +1,8 @@
-export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
-exp_name="test"
+export CUDA_VISIBLE_DEVICES=0
+exp_name="雷电将军"
 target_model="sovits" # sovits  diffusion
 torchrun \
-    --nproc_per_node=7 \
+    --nproc_per_node=1 \
     --master_port=6791 \
     --master_addr='localhost' \
     train.py \

@@ -428,7 +428,7 @@ def load_filepaths_and_text(filename, split="|"):
 
 def get_hparams():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exp_name", default="gensin", type=str, help="本次实验名")
+    parser.add_argument("--exp_name", default="八重神子", type=str, help="本次实验名")
     parser.add_argument(
         "--target_model",
         default="diffusion",  # diffusion sovits
@@ -608,6 +608,7 @@ def train_index(
     big_npy_idx = np.arange(big_npy.shape[0])
     np.random.shuffle(big_npy_idx)
     big_npy = big_npy[big_npy_idx]
+    print(big_npy.shape)
     if big_npy.shape[0] > 2e5:
         # if(1):
         info = "Trying doing kmeans %s shape to 10k centers." % big_npy.shape[0]

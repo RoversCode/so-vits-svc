@@ -23,7 +23,7 @@ infer:
   method: dpm-solver++
   speedup: 10
 model:
-  k_step_max: 0
+  k_step_max: 100
   n_chans: 512
   n_hidden: 256
   n_layers: 20
@@ -37,7 +37,7 @@ train:
   seed: 42
   log_interval: 10
   per_epoch_save: 20
-  epochs: 100000
+  epochs: 100
   decay_step: 100000
   num_workers: 5
   prefetch: 5

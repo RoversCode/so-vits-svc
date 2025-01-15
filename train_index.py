@@ -37,5 +37,6 @@ if __name__ == "__main__":
         index = utils.train_index(k, Path("ckpts")/hps.args.exp_name/'audio_slice')
         result[v] = index
     output_dir = Path("ckpts")/hps.args.exp_name/'index'/'feature_and_index.pkl'
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
     with open(output_dir, "wb") as f:
         pickle.dump(result, f)

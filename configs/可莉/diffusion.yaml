@@ -1,0 +1,61 @@
+data: !!python/object:utils.HParams
+  batch_size: 48
+  batch_type: dynamic
+  block_size: 512
+  cnhubertsoft_gate: 10
+  duration: 1.5
+  encoder: vec768l12
+  encoder_hop_size: 320
+  encoder_out_channels: 768
+  encoder_sample_rate: 16000
+  extensions:
+  - wav
+  hop_length: 512
+  max_frames_in_batch: 3000
+  sampling_rate: 44100
+  shuffle_size: 100
+  sort_size: 50
+  spk:
+    keli: 0
+  training_files: "ckpts/\u53EF\u8389/train.list"
+  unit_interpolate_mode: nearest
+  validation_files: "ckpts/\u53EF\u8389/val.list"
+infer: !!python/object:utils.HParams
+  method: dpm-solver++
+  speedup: 10
+model: !!python/object:utils.HParams
+  k_step_max: 100
+  n_chans: 512
+  n_hidden: 256
+  n_layers: 20
+  n_spk: 1
+  timesteps: 1000
+  type: Diffusion
+  use_pitch_aug: true
+train: !!python/object:utils.HParams
+  cache_fp16: true
+  decay_step: 100000
+  epochs: 100000
+  fp16_run: false
+  gamma: 0.5
+  log_interval: 10
+  lr: 0.0001
+  num_workers: 5
+  per_epoch_save: 20
+  per_step_epoch: 30000
+  pin_memory: true
+  prefetch: 5
+  save_opt: false
+  seed: 42
+  skip_optimizer: false
+  train_env: !!python/object:utils.HParams
+    LOCAL_RANK: 0
+    MASTER_ADDR: localhost
+    MASTER_PORT: 10086
+    RANK: 0
+    WORLD_SIZE: 1
+  train_type: finetune
+  weight_decay: 0
+vocoder: !!python/object:utils.HParams
+  ckpt: pretrain/nsf_hifigan/model
+  type: nsf-hifigan

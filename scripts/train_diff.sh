@@ -1,5 +1,5 @@
 export CUDA_VISIBLE_DEVICES=0
-exp_name="gensin"
+exp_name="芙宁娜"
 target_model="diffusion"
 torchrun \
     --nproc_per_node=1 \

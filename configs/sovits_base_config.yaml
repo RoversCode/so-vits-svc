@@ -6,7 +6,7 @@ train:
   pin_memory: true
   num_workers: 5
   prefetch: 5
-  learning_rate: 0.00005
+  learning_rate: 0.0001
   betas: [0.8, 0.99]
   eps: 1.0e-9
   fp16_run: false
@@ -47,8 +47,8 @@ data:
   unit_interpolate_mode: nearest
   vol_embedding: true
   vol_aug: true
-  shuffle_size: 1000
-  sort_size: 500
+  shuffle_size: 20
+  sort_size: 10
   batch_type: dynamic
   max_frames_in_batch: 5000
 

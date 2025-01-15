@@ -1,4 +1,4 @@
-name="paimen"
+name="可莉"
 python preprocess/rename_and_slice.py  \
  --audio_dir ckpts/$name/raw_audio \
  --sr 44100 \
